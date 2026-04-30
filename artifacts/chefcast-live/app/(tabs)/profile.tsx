@@ -130,7 +130,7 @@ export default function ProfileScreen() {
         <View style={[styles.statsGrid, { backgroundColor: colors.surface }]}>
           {[
             { label: "Total XP", value: xpTotal.toLocaleString(), icon: "star" as const, color: colors.accent },
-            { label: "Badges", value: `${unlockedBadges}/12`, icon: "award" as const, color: colors.primary },
+            { label: "Badges", value: `${unlockedBadges}/10`, icon: "award" as const, color: colors.primary },
             { label: "Best Streak", value: `${longestStreak}d`, icon: "zap" as const, color: colors.warning },
             { label: "Sessions", value: "12", icon: "coffee" as const, color: colors.success },
           ].map((stat, idx) => (

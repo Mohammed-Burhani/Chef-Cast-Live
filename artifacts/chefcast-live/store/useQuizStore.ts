@@ -90,10 +90,13 @@ interface QuizState {
 
 const STORAGE_KEY = "@chefcast:quizResults";
 
-/** Calculate points for a correct answer based on response speed */
+/** Calculate points for a correct answer based on response speed
+ * Base: 100 points per correct answer
+ * Speed Bonus: Up to +50 points, scaled linearly by how quickly answered
+ */
 function calcPoints(base: number, totalSeconds: number, remainingSeconds: number): number {
   const speedRatio = remainingSeconds / totalSeconds;
-  const speedBonus = Math.round(base * 0.5 * speedRatio);
+  const speedBonus = Math.round(50 * speedRatio); // Up to +50 points
   return base + speedBonus;
 }
 
@@ -120,6 +123,9 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
       sessionScore: 0,
       countdownValue: 3,
     });
+    // Note: Late join handling - viewers who join mid-session see the current
+    // active question and can answer it. Past questions are not replayed;
+    // scoring begins from their first answered question (no penalty for missed questions).
   },
 
   tickCountdown: () => {

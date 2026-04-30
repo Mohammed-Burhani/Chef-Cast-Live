@@ -2,6 +2,7 @@
  * Gamification store using Zustand.
  * Manages XP totals, badge collection, streak tracking, and XP log.
  * Persists to AsyncStorage so progress is saved between sessions.
+ * Updated for v2.0 specification.
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -32,12 +33,12 @@ interface GamificationState {
   badges: Badge[];
   /** Recent XP earning events for the XP log */
   xpLog: XPLogEntry[];
-  /** Number of polls voted in (for badge tracking) */
-  pollsVoted: number;
-  /** Number of knife_work steps completed */
-  knifeWorkSteps: number;
-  /** Number of sauce steps completed */
-  sauceSteps: number;
+  /** Number of episodes participated in */
+  episodesParticipated: number;
+  /** Number of speed bonuses earned */
+  speedBonusCount: number;
+  /** Total likes received on dish photos */
+  totalLikes: number;
 
   /** Load gamification state from AsyncStorage */
   loadFromStorage: () => Promise<void>;
@@ -48,7 +49,7 @@ interface GamificationState {
   /** Update streak after completing a cook session */
   updateStreak: () => Promise<void>;
   /** Increment a badge progress counter */
-  incrementProgress: (field: "pollsVoted" | "knifeWorkSteps" | "sauceSteps") => Promise<void>;
+  incrementProgress: (field: "episodesParticipated" | "speedBonusCount" | "totalLikes") => Promise<void>;
 }
 
 const STORAGE_KEY = "@chefcast:gamification";
@@ -56,28 +57,27 @@ const STORAGE_KEY = "@chefcast:gamification";
 const getInitialBadges = (): Badge[] =>
   ALL_BADGES.map((b, idx) => ({
     ...b,
-    isUnlocked: idx < 3,
-    earnedAt: idx < 3 ? new Date(Date.now() - 1000 * 60 * 60 * 24 * idx).toISOString() : undefined,
-    progress: idx < 3 ? (b.maxProgress ?? 1) : Math.floor((b.maxProgress ?? 1) * 0.4),
+    isUnlocked: idx < 2,
+    earnedAt: idx < 2 ? new Date(Date.now() - 1000 * 60 * 60 * 24 * idx).toISOString() : undefined,
+    progress: idx < 2 ? (b.maxProgress ?? 1) : Math.floor((b.maxProgress ?? 1) * 0.3),
     maxProgress: b.maxProgress ?? 1,
   }));
 
 export const useGamificationStore = create<GamificationState>()((set, get) => ({
-  xpTotal: 1250,
-  currentStreak: 5,
-  longestStreak: 12,
+  xpTotal: 850,
+  currentStreak: 3,
+  longestStreak: 8,
   lastCookedAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
   badges: getInitialBadges(),
   xpLog: [
-    { id: "log-1", event: "COOK_SESSION_COMPLETED", amount: 100, label: "Completed Italian Risotto Night", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString() },
-    { id: "log-2", event: "STEP_COMPLETED", amount: 5, label: "Step completed: knife work", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 18 + 1000 * 60 * 5).toISOString() },
-    { id: "log-3", event: "POLL_VOTED", amount: 10, label: "Voted in live poll", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString() },
-    { id: "log-4", event: "DISH_PHOTO_UPLOADED", amount: 25, label: "Shared dish photo", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString() },
-    { id: "log-5", event: "STREAK_3_DAYS", amount: 75, label: "3-day cooking streak bonus!", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString() },
+    { id: "log-1", event: "CORRECT_ANSWER", amount: 20, label: "Correct answer in Italian Risotto Night", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString() },
+    { id: "log-2", event: "TOP_10_FINISH", amount: 50, label: "Top 10 finish", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 18 + 1000 * 60 * 5).toISOString() },
+    { id: "log-3", event: "DISH_PHOTO_UPLOADED", amount: 25, label: "Shared dish photo", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString() },
+    { id: "log-4", event: "MYSTERY_BOX_SUBMITTED", amount: 50, label: "Mystery Box submission", timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString() },
   ],
-  pollsVoted: 4,
-  knifeWorkSteps: 2,
-  sauceSteps: 3,
+  episodesParticipated: 3,
+  speedBonusCount: 5,
+  totalLikes: 28,
 
   loadFromStorage: async () => {
     try {
@@ -113,7 +113,11 @@ export const useGamificationStore = create<GamificationState>()((set, get) => ({
         : b
     );
     set({ badges });
-    await get().awardXP("BADGE_EARNED", `Earned badge!`);
+    const badge = ALL_BADGES.find((b) => b.slug === slug);
+    if (badge) {
+      await get().awardXP("CORRECT_ANSWER", `Earned badge: ${badge.name}! +${badge.xpReward} XP`);
+    }
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(get()));
   },
 
   updateStreak: async () => {
@@ -133,10 +137,12 @@ export const useGamificationStore = create<GamificationState>()((set, get) => ({
 
     const newLongest = Math.max(longestStreak, newStreak);
     set({ currentStreak: newStreak, longestStreak: newLongest, lastCookedAt: now.toISOString() });
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(get()));
   },
 
   incrementProgress: async (field) => {
     const current = get()[field];
     set({ [field]: current + 1 } as Partial<GamificationState>);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(get()));
   },
 }));
