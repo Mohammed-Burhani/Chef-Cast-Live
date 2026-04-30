@@ -17,6 +17,9 @@ export const XP_REWARDS: Record<XPEvent, number> = {
   STREAK_7_DAYS: 200,
   STREAK_30_DAYS: 1000,
   BADGE_EARNED: 50,
+  QUIZ_COMPLETED: 150,
+  QUIZ_PERFECT_SCORE: 500,
+  QUIZ_TOP_10: 200,
 };
 
 export interface Level {

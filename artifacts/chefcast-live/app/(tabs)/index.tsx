@@ -208,8 +208,8 @@ export default function HomeScreen() {
                 style={[styles.joinButton, { backgroundColor: colors.live }]}
                 onPress={() => router.push("/(tabs)/cook-along" as never)}
               >
-                <Feather name="play" size={16} color="#fff" />
-                <Text style={styles.joinButtonText}>Join Cook-Along</Text>
+                <Feather name="zap" size={16} color="#fff" />
+                <Text style={styles.joinButtonText}>Join Live Quiz</Text>
               </TouchableOpacity>
             </View>
           </View>

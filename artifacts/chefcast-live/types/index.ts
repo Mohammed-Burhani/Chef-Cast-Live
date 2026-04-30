@@ -1,6 +1,5 @@
 /**
  * Central TypeScript type definitions for ChefCast: Live.
- * All shared interfaces live here to ensure consistency across the app.
  */
 
 export interface UserProfile {
@@ -30,6 +29,7 @@ export interface Episode {
   episodeNumber: number;
   difficulty: "easy" | "medium" | "hard";
   duration: number;
+  hasQuiz?: boolean;
 }
 
 export interface Ingredient {
@@ -130,16 +130,17 @@ export interface LeaderboardEntry {
   isCurrentUser: boolean;
 }
 
-export interface CookSession {
+export interface CommunityPost {
   id: string;
-  episodeId: string;
-  recipeId: string;
-  completedSteps: number[];
-  completed: boolean;
-  dishPhotoUrl?: string;
-  startedAt: string;
-  completedAt?: string;
-  score: number;
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  episodeTitle: string;
+  photoUrl: string;
+  caption: string;
+  likes: number;
+  isLiked: boolean;
+  createdAt: string;
 }
 
 export interface MysteryBoxSubmission {
@@ -150,6 +151,67 @@ export interface MysteryBoxSubmission {
   dishIdea: string;
   isFeaturedOnTv: boolean;
   submittedAt: string;
+}
+
+// ─── Live Quiz Types ─────────────────────────────────────────────────────────
+
+export interface QuizOption {
+  id: string;
+  label: "A" | "B" | "C" | "D";
+  text: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  text: string;
+  options: QuizOption[];
+  correctOptionId: string;
+  timerSeconds: number;
+  explanation?: string;
+  category?: string;
+  pointsBase: number;
+}
+
+export interface QuizAnswer {
+  questionId: string;
+  selectedOptionId: string | null;
+  isCorrect: boolean;
+  pointsEarned: number;
+  responseTimeMs: number;
+}
+
+export interface QuizEvent {
+  id: string;
+  episodeId: string;
+  episodeTitle: string;
+  thumbnailUrl: string;
+  chefName: string;
+  totalQuestions: number;
+  scheduledAt: string;
+  isLive: boolean;
+  participantCount: number;
+}
+
+export interface QuizEventResult {
+  eventId: string;
+  eventTitle: string;
+  date: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  totalScore: number;
+  rank: number;
+  totalParticipants: number;
+  answers: QuizAnswer[];
+}
+
+export interface QuizLeaderboardEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  score: number;
+  correctAnswers: number;
+  avgResponseMs: number;
+  isCurrentUser: boolean;
 }
 
 export type XPEvent =
@@ -163,4 +225,7 @@ export type XPEvent =
   | "STREAK_3_DAYS"
   | "STREAK_7_DAYS"
   | "STREAK_30_DAYS"
-  | "BADGE_EARNED";
+  | "BADGE_EARNED"
+  | "QUIZ_COMPLETED"
+  | "QUIZ_PERFECT_SCORE"
+  | "QUIZ_TOP_10";

@@ -1,15 +1,24 @@
 /**
- * Cook-Along screen — the core interactive cooking experience.
- * Split-screen layout: video player (top 55%) + interactive tabs (bottom 45%).
- * Tabs: Steps | Ingredients | Tips
+ * Live Quiz screen — the core real-time game experience.
+ *
+ * State machine:
+ *   idle  →  countdown (3-2-1)  →  question (timer)
+ *         →  revealing (correct/wrong shown)
+ *         →  between (mini leaderboard)
+ *         →  (loop for each question)
+ *         →  complete (final leaderboard)
+ *
+ * In production, the host pushes questions via Supabase Realtime.
+ * Here we simulate with mock data and a local timer.
  */
 
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
   Dimensions,
   Platform,
   ScrollView,
@@ -18,306 +27,786 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CookTimer } from "@/components/cook-along/CookTimer";
-import { StepCard } from "@/components/cook-along/StepCard";
-import { MOCK_EPISODES, MOCK_RECIPE } from "@/constants/mockData";
+import { MOCK_QUIZ_EVENT } from "@/constants/mockData";
 import { useColors } from "@/hooks/useColors";
-import { useCookAlongStore } from "@/store/useCookAlongStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
-import { Ingredient } from "@/types";
+import { useQuizStore } from "@/store/useQuizStore";
+import { QuizLeaderboardEntry, QuizOption } from "@/types";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const VIDEO_HEIGHT = SCREEN_HEIGHT * 0.38;
+const { width: SW, height: SH } = Dimensions.get("window");
+const MEDAL_COLORS = ["#F5A623", "#C0C0C0", "#CD7F32"];
 
-function IngredientRow({ ingredient, isChecked, onToggle }: { ingredient: Ingredient; isChecked: boolean; onToggle: () => void }) {
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function TimerRing({ remaining, total }: { remaining: number; total: number }) {
   const colors = useColors();
+  const size = 72;
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const progress = total > 0 ? remaining / total : 0;
+  const isUrgent = remaining <= 5;
+
   return (
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.75}
-      style={[styles.ingredientRow, { borderBottomColor: colors.border }]}
-    >
-      <View style={[
-        styles.checkbox,
-        {
-          backgroundColor: isChecked ? colors.primary : "transparent",
-          borderColor: isChecked ? colors.primary : colors.border,
-        }
-      ]}>
-        {isChecked && <Feather name="check" size={12} color="#fff" />}
-      </View>
-      <Text style={[
-        styles.ingredientName,
-        {
-          color: isChecked ? colors.mutedForeground : colors.foreground,
-          textDecorationLine: isChecked ? "line-through" : "none",
-        }
-      ]}>
-        {ingredient.name}
+    <View style={styles.timerRingWrap}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.surface} strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2} cy={size / 2} r={r}
+          stroke={isUrgent ? colors.live : colors.primary}
+          strokeWidth={stroke} fill="none"
+          strokeDasharray={circ}
+          strokeDashoffset={circ * (1 - progress)}
+          strokeLinecap="round"
+          rotation="-90"
+          origin={`${size / 2},${size / 2}`}
+        />
+      </Svg>
+      <Text style={[styles.timerNumber, { color: isUrgent ? colors.live : colors.foreground }]}>
+        {remaining}
       </Text>
-      <Text style={[styles.ingredientQty, { color: colors.mutedForeground }]}>
-        {ingredient.quantity} {ingredient.unit}
-      </Text>
-      {ingredient.isOptional && (
-        <Text style={[styles.optionalTag, { color: colors.mutedForeground }]}>opt</Text>
-      )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
-export default function CookAlongScreen() {
+function OptionButton({
+  option, selected, correctId, phase, onPress,
+}: {
+  option: QuizOption;
+  selected: string | null;
+  correctId: string;
+  phase: string;
+  onPress: () => void;
+}) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const {
-    recipe, currentStepIndex, completedStepIds, checkedIngredientIds,
-    activeTab, startSession, nextStep, prevStep, toggleIngredient, setActiveTab,
-  } = useCookAlongStore();
-  const { awardXP } = useGamificationStore();
+  const isRevealing = phase === "revealing";
+  const isCorrect = option.id === correctId;
+  const isSelected = option.id === selected;
+  const isWrong = isSelected && !isCorrect;
 
-  useEffect(() => {
-    if (!recipe) {
-      startSession(MOCK_RECIPE);
-    }
-  }, []);
+  let bg = colors.surface;
+  let border = colors.border;
+  let textColor = colors.foreground;
 
-  const episode = MOCK_EPISODES[0];
-  const currentRecipe = recipe ?? MOCK_RECIPE;
-  const currentStep = currentRecipe.steps[currentStepIndex];
-  const totalSteps = currentRecipe.steps.length;
-  const completedCount = completedStepIds.size;
-  const progressPercent = totalSteps > 0 ? completedCount / totalSteps : 0;
+  if (isRevealing) {
+    if (isCorrect) { bg = `${colors.success}22`; border = colors.success; textColor = colors.success; }
+    else if (isWrong) { bg = `${colors.danger}22`; border = colors.danger; textColor = colors.danger; }
+  } else if (isSelected) {
+    bg = `${colors.primary}22`; border = colors.primary; textColor = colors.primary;
+  }
 
-  const handleNextStep = () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    awardXP("STEP_COMPLETED", `Step ${currentStepIndex + 1} completed`);
-    nextStep();
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.96, duration: 80, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 30 }),
+    ]).start();
+    onPress();
   };
 
-  const TABS: Array<{ id: "steps" | "ingredients" | "tips"; label: string }> = [
-    { id: "steps", label: "Steps" },
-    { id: "ingredients", label: "Ingredients" },
-    { id: "tips", label: "Tips" },
-  ];
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={0.85}
+        disabled={phase !== "question" || selected !== null}
+        style={[styles.optionBtn, { backgroundColor: bg, borderColor: border }]}
+      >
+        <View style={[styles.optionLabel, { backgroundColor: `${border}33` }]}>
+          <Text style={[styles.optionLabelText, { color: border === colors.border ? colors.mutedForeground : border }]}>
+            {option.label}
+          </Text>
+        </View>
+        <Text style={[styles.optionText, { color: textColor }]}>{option.text}</Text>
+        {isRevealing && isCorrect && (
+          <Feather name="check-circle" size={18} color={colors.success} style={{ marginLeft: "auto" }} />
+        )}
+        {isRevealing && isWrong && (
+          <Feather name="x-circle" size={18} color={colors.danger} style={{ marginLeft: "auto" }} />
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+function MiniLeaderboard({ entries }: { entries: QuizLeaderboardEntry[] }) {
+  const colors = useColors();
+  const top5 = entries.slice(0, 5);
+  const me = entries.find((e) => e.isCurrentUser);
+  const meIsTop5 = me && me.rank <= 5;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Video section */}
-      <View style={[styles.videoSection, { height: VIDEO_HEIGHT }]}>
-        <Image
-          source={{ uri: episode.thumbnailUrl }}
-          style={styles.videoPlaceholder}
-          contentFit="cover"
-        />
-        <LinearGradient
-          colors={["rgba(0,0,0,0.5)", "transparent", "rgba(0,0,0,0.7)"]}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Live badge */}
-        {episode.isLive && (
-          <View style={[styles.liveBadge, { backgroundColor: colors.live }]}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
+    <View style={styles.miniLb}>
+      {top5.map((entry) => (
+        <View
+          key={entry.userId}
+          style={[
+            styles.miniLbRow,
+            {
+              backgroundColor: entry.isCurrentUser ? `${colors.primary}20` : colors.surface,
+              borderColor: entry.isCurrentUser ? colors.primary : "transparent",
+              borderWidth: entry.isCurrentUser ? 1.5 : 0,
+            },
+          ]}
+        >
+          <Text style={[styles.miniLbRank, { color: entry.rank <= 3 ? MEDAL_COLORS[entry.rank - 1] : colors.mutedForeground }]}>
+            #{entry.rank}
+          </Text>
+          <Text style={[styles.miniLbName, { color: entry.isCurrentUser ? colors.primary : colors.foreground }]}>
+            {entry.username}{entry.isCurrentUser ? " (you)" : ""}
+          </Text>
+          <Text style={[styles.miniLbScore, { color: entry.rank <= 3 ? MEDAL_COLORS[entry.rank - 1] : colors.foreground }]}>
+            {entry.score.toLocaleString()}
+          </Text>
+        </View>
+      ))}
+      {!meIsTop5 && me && (
+        <>
+          <Text style={[styles.ellipsis, { color: colors.mutedForeground }]}>· · ·</Text>
+          <View style={[styles.miniLbRow, { backgroundColor: `${colors.primary}20`, borderColor: colors.primary, borderWidth: 1.5 }]}>
+            <Text style={[styles.miniLbRank, { color: colors.primary }]}>#{me.rank}</Text>
+            <Text style={[styles.miniLbName, { color: colors.primary }]}>you</Text>
+            <Text style={[styles.miniLbScore, { color: colors.primary }]}>{me.score.toLocaleString()}</Text>
           </View>
-        )}
+        </>
+      )}
+    </View>
+  );
+}
 
-        {/* Episode title overlay */}
-        <View style={[styles.videoOverlay, { paddingTop: (Platform.OS === "web" ? 67 : insets.top) + 8 }]}>
-          <Text style={styles.episodeTitle}>{episode.title}</Text>
-          <Text style={styles.chefName}>{episode.chefName}</Text>
-        </View>
+// ─── Phase screens ──────────────────────────────────────────────────────────
 
-        {/* Progress bar */}
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progressPercent * 100}%`, backgroundColor: colors.primary }]} />
+function IdleScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const { startQuiz, pastResults, loadPastResults } = useQuizStore();
+
+  useEffect(() => { loadPastResults(); }, []);
+
+  const event = MOCK_QUIZ_EVENT;
+  const timeToStart = new Date(event.scheduledAt).getTime() - Date.now();
+
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.idleContent, { paddingTop: topPad + 16, paddingBottom: bottomPad + 80 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Live event card */}
+      <View style={[styles.eventCard, { backgroundColor: colors.surface }]}>
+        <Image source={{ uri: event.thumbnailUrl }} style={styles.eventThumb} contentFit="cover" />
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.85)"]} style={StyleSheet.absoluteFill} />
+        <View style={styles.eventCardOverlay}>
+          <View style={[styles.livePill, { backgroundColor: colors.live }]}>
+            <View style={styles.liveDot} />
+            <Text style={styles.livePillText}>LIVE QUIZ</Text>
+          </View>
+          <Text style={styles.eventTitle}>{event.episodeTitle}</Text>
+          <Text style={styles.eventChef}>{event.chefName}</Text>
+          <View style={styles.eventMeta}>
+            <View style={styles.eventMetaItem}>
+              <Feather name="users" size={13} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.eventMetaText}>{event.participantCount.toLocaleString()} playing</Text>
+            </View>
+            <View style={styles.eventMetaItem}>
+              <Feather name="help-circle" size={13} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.eventMetaText}>{event.totalQuestions} questions</Text>
+            </View>
+          </View>
         </View>
-        <Text style={[styles.progressLabel, { color: "rgba(255,255,255,0.7)" }]}>
-          {completedCount}/{totalSteps} steps
+      </View>
+
+      {/* Join button */}
+      <TouchableOpacity
+        onPress={() => {
+          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          startQuiz();
+        }}
+        style={[styles.joinBtn, { backgroundColor: colors.primary }]}
+      >
+        <Feather name="zap" size={20} color="#fff" />
+        <Text style={styles.joinBtnText}>Join Live Quiz</Text>
+      </TouchableOpacity>
+
+      <View style={[styles.hintCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Feather name="info" size={15} color={colors.primary} />
+        <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
+          Answer faster for more points. A correct answer in 2 seconds beats the same answer in 10.
         </Text>
       </View>
 
-      {/* Bottom interactive section */}
-      <View style={[styles.bottomSection, { flex: 1, backgroundColor: colors.background }]}>
-        {/* Tab bar */}
-        <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-          {TABS.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              style={[styles.tab, activeTab === tab.id && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-            >
-              <Text style={[styles.tabLabel, { color: activeTab === tab.id ? colors.primary : colors.mutedForeground }]}>
-                {tab.label}
-              </Text>
-              {tab.id === "ingredients" && (
-                <View style={[styles.tabBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.tabBadgeText}>{currentRecipe.ingredients.length}</Text>
+      {/* Past results */}
+      {pastResults.length > 0 && (
+        <View style={styles.pastSection}>
+          <Text style={[styles.pastTitle, { color: colors.foreground }]}>Your Quiz History</Text>
+          {pastResults.map((r) => (
+            <View key={r.eventId} style={[styles.pastCard, { backgroundColor: colors.surface }]}>
+              <View style={styles.pastCardHeader}>
+                <Text style={[styles.pastCardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  {r.eventTitle}
+                </Text>
+                <Text style={[styles.pastCardDate, { color: colors.mutedForeground }]}>
+                  {new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </Text>
+              </View>
+              <View style={styles.pastCardStats}>
+                <View style={styles.pastStat}>
+                  <Text style={[styles.pastStatVal, { color: colors.accent }]}>
+                    #{r.rank}
+                  </Text>
+                  <Text style={[styles.pastStatLabel, { color: colors.mutedForeground }]}>
+                    of {r.totalParticipants.toLocaleString()}
+                  </Text>
                 </View>
-              )}
-            </TouchableOpacity>
+                <View style={styles.pastStat}>
+                  <Text style={[styles.pastStatVal, { color: colors.foreground }]}>
+                    {r.correctAnswers}/{r.totalQuestions}
+                  </Text>
+                  <Text style={[styles.pastStatLabel, { color: colors.mutedForeground }]}>correct</Text>
+                </View>
+                <View style={styles.pastStat}>
+                  <Text style={[styles.pastStatVal, { color: colors.foreground }]}>
+                    {r.totalScore.toLocaleString()}
+                  </Text>
+                  <Text style={[styles.pastStatLabel, { color: colors.mutedForeground }]}>pts</Text>
+                </View>
+              </View>
+            </View>
           ))}
         </View>
+      )}
+    </ScrollView>
+  );
+}
 
-        {/* Tab content */}
-        <ScrollView
-          style={styles.tabContent}
-          contentContainerStyle={[styles.tabContentInner, { paddingBottom: bottomPadding + 80 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* STEPS TAB */}
-          {activeTab === "steps" && currentStep && (
-            <View style={styles.stepsTab}>
-              <StepCard
-                step={currentStep}
-                stepNumber={currentStepIndex + 1}
-                totalSteps={totalSteps}
-                isCompleted={completedStepIds.has(currentStep.id)}
-              />
+function CountdownScreen() {
+  const colors = useColors();
+  const { countdownValue, tickCountdown } = useQuizStore();
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
 
-              {currentStep.durationSeconds && (
-                <View style={[styles.timerContainer, { backgroundColor: colors.surface }]}>
-                  <Text style={[styles.timerLabel, { color: colors.mutedForeground }]}>Step Timer</Text>
-                  <CookTimer totalSeconds={currentStep.durationSeconds} />
-                </View>
-              )}
+  useEffect(() => {
+    Animated.sequence([
+      Animated.spring(scaleAnim, { toValue: 1.1, useNativeDriver: true, speed: 30 }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+  }, [countdownValue]);
 
-              {/* Navigation */}
-              <View style={styles.stepNav}>
-                <TouchableOpacity
-                  onPress={prevStep}
-                  disabled={currentStepIndex === 0}
-                  style={[styles.navBtn, { backgroundColor: colors.surface, opacity: currentStepIndex === 0 ? 0.4 : 1 }]}
-                >
-                  <Feather name="arrow-left" size={20} color={colors.foreground} />
-                </TouchableOpacity>
+  useEffect(() => {
+    const t = setTimeout(() => tickCountdown(), 1000);
+    return () => clearTimeout(t);
+  }, [countdownValue]);
 
-                <TouchableOpacity
-                  onPress={handleNextStep}
-                  style={[styles.nextBtn, { backgroundColor: colors.primary }]}
-                  disabled={currentStepIndex === totalSteps - 1}
-                >
-                  <Text style={styles.nextBtnText}>
-                    {currentStepIndex === totalSteps - 1 ? "Done!" : "Next Step"}
-                  </Text>
-                  {currentStepIndex < totalSteps - 1 && (
-                    <Feather name="arrow-right" size={18} color="#fff" />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
+  return (
+    <View style={[styles.fullCenter, { backgroundColor: colors.background }]}>
+      <Text style={[styles.countdownLabel, { color: colors.mutedForeground }]}>Get ready!</Text>
+      <Animated.Text
+        style={[styles.countdownNumber, { color: colors.primary, transform: [{ scale: scaleAnim }] }]}
+      >
+        {countdownValue}
+      </Animated.Text>
+      <Text style={[styles.countdownSub, { color: colors.mutedForeground }]}>Quiz starting…</Text>
+    </View>
+  );
+}
+
+function QuestionScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const {
+    questions, currentQuestionIndex, timerRemaining, selectedOptionId,
+    phase, selectAnswer, tickTimer,
+  } = useQuizStore();
+
+  const question = questions[currentQuestionIndex];
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+  }, [currentQuestionIndex]);
+
+  useEffect(() => {
+    if (phase !== "question") return;
+    const t = setInterval(() => tickTimer(), 1000);
+    return () => clearInterval(t);
+  }, [phase, currentQuestionIndex]);
+
+  if (!question) return null;
+
+  const handleSelect = (optionId: string) => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    selectAnswer(optionId);
+  };
+
+  return (
+    <Animated.ScrollView
+      style={{ opacity: fadeAnim, backgroundColor: colors.background }}
+      contentContainerStyle={[
+        styles.questionContent,
+        { paddingTop: topPad + 16, paddingBottom: bottomPad + 24 },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Top bar */}
+      <View style={styles.questionTopBar}>
+        <View style={[styles.qProgressPills, { gap: 4 }]}>
+          {questions.map((_, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.progressPill,
+                {
+                  backgroundColor:
+                    idx < currentQuestionIndex
+                      ? colors.success
+                      : idx === currentQuestionIndex
+                      ? colors.primary
+                      : colors.surface,
+                  flex: 1,
+                },
+              ]}
+            />
+          ))}
+        </View>
+        <TimerRing remaining={timerRemaining} total={question.timerSeconds} />
+      </View>
+
+      {/* Question meta */}
+      <View style={styles.questionMeta}>
+        <View style={[styles.categoryPill, { backgroundColor: `${colors.accent}20` }]}>
+          <Text style={[styles.categoryText, { color: colors.accent }]}>{question.category}</Text>
+        </View>
+        <Text style={[styles.questionCounter, { color: colors.mutedForeground }]}>
+          Q{currentQuestionIndex + 1} of {questions.length}
+        </Text>
+      </View>
+
+      {/* Question text */}
+      <Text style={[styles.questionText, { color: colors.foreground }]}>{question.text}</Text>
+
+      {/* Options */}
+      <View style={styles.optionsGrid}>
+        {question.options.map((opt) => (
+          <OptionButton
+            key={opt.id}
+            option={opt}
+            selected={selectedOptionId}
+            correctId={question.correctOptionId}
+            phase={phase}
+            onPress={() => handleSelect(opt.id)}
+          />
+        ))}
+      </View>
+    </Animated.ScrollView>
+  );
+}
+
+function RevealingScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const { questions, currentQuestionIndex, selectedOptionId, userAnswers, sessionScore, showBetweenLeaderboard } = useQuizStore();
+  const { awardXP } = useGamificationStore();
+
+  const question = questions[currentQuestionIndex];
+  const lastAnswer = userAnswers[userAnswers.length - 1];
+  const isCorrect = lastAnswer?.isCorrect ?? false;
+  const pointsEarned = lastAnswer?.pointsEarned ?? 0;
+  const pointsAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(
+        isCorrect
+          ? Haptics.NotificationFeedbackType.Success
+          : Haptics.NotificationFeedbackType.Error
+      );
+    }
+    Animated.parallel([
+      Animated.timing(pointsAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, speed: 15 }),
+    ]).start();
+  }, []);
+
+  // Auto-advance after 3.5s
+  useEffect(() => {
+    const t = setTimeout(() => showBetweenLeaderboard(), 3500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!question) return null;
+
+  return (
+    <View style={[styles.revealContainer, { backgroundColor: colors.background, paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }]}>
+      {/* Result banner */}
+      <Animated.View
+        style={[
+          styles.resultBanner,
+          {
+            backgroundColor: isCorrect ? `${colors.success}20` : `${colors.danger}15`,
+            borderColor: isCorrect ? colors.success : colors.danger,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
+      >
+        <Feather
+          name={isCorrect ? "check-circle" : selectedOptionId ? "x-circle" : "clock"}
+          size={28}
+          color={isCorrect ? colors.success : colors.danger}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.resultTitle, { color: isCorrect ? colors.success : colors.danger }]}>
+            {isCorrect ? "Correct!" : selectedOptionId ? "Wrong answer" : "Time's up!"}
+          </Text>
+          {isCorrect ? (
+            <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>
+              +{pointsEarned.toLocaleString()} pts earned
+            </Text>
+          ) : (
+            <Text style={[styles.resultSub, { color: colors.mutedForeground }]}>No points this round</Text>
           )}
+        </View>
+        <Animated.Text style={[styles.pointsBurst, { color: colors.accent, opacity: pointsAnim, transform: [{ scale: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }] }]}>
+          {isCorrect ? `+${pointsEarned.toLocaleString()}` : ""}
+        </Animated.Text>
+      </Animated.View>
 
-          {/* INGREDIENTS TAB */}
-          {activeTab === "ingredients" && (
-            <View style={[styles.ingredientsContainer, { backgroundColor: colors.surface }]}>
-              <View style={styles.ingredientsHeader}>
-                <Text style={[styles.ingredientsTitle, { color: colors.foreground }]}>
-                  {currentRecipe.ingredients.filter(i => !i.isOptional).length} ingredients
-                </Text>
-                <Text style={[styles.checkedCount, { color: colors.mutedForeground }]}>
-                  {checkedIngredientIds.size} prepped
-                </Text>
-              </View>
-              {currentRecipe.ingredients.map((ing) => (
-                <IngredientRow
-                  key={ing.id}
-                  ingredient={ing}
-                  isChecked={checkedIngredientIds.has(ing.id)}
-                  onToggle={() => toggleIngredient(ing.id)}
-                />
-              ))}
-            </View>
-          )}
+      {/* Re-show options with correct highlighted */}
+      <Text style={[styles.revealQuestion, { color: colors.foreground }]}>{question.text}</Text>
+      <View style={styles.optionsGrid}>
+        {question.options.map((opt) => (
+          <OptionButton
+            key={opt.id}
+            option={opt}
+            selected={selectedOptionId}
+            correctId={question.correctOptionId}
+            phase="revealing"
+            onPress={() => {}}
+          />
+        ))}
+      </View>
 
-          {/* TIPS TAB */}
-          {activeTab === "tips" && currentStep && (
-            <View style={styles.tipsTab}>
-              {currentStep.tip ? (
-                <View style={[styles.tipCard, { backgroundColor: `${colors.primary}15`, borderColor: colors.primary }]}>
-                  <Feather name="info" size={20} color={colors.primary} />
-                  <View style={styles.tipContent}>
-                    <Text style={[styles.tipTitle, { color: colors.primary }]}>Chef's Tip for Step {currentStepIndex + 1}</Text>
-                    <Text style={[styles.tipText, { color: colors.foreground }]}>{currentStep.tip}</Text>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.noTip}>
-                  <Feather name="coffee" size={32} color={colors.mutedForeground} />
-                  <Text style={[styles.noTipText, { color: colors.mutedForeground }]}>
-                    No tips for this step — just cook!
-                  </Text>
-                </View>
-              )}
+      {/* Explanation */}
+      {question.explanation && (
+        <View style={[styles.explanationBox, { backgroundColor: `${colors.primary}12`, borderColor: colors.primary }]}>
+          <Feather name="info" size={14} color={colors.primary} />
+          <Text style={[styles.explanationText, { color: colors.foreground }]}>
+            <Text style={{ color: colors.primary, fontWeight: "700" }}>Chef says: </Text>
+            {question.explanation}
+          </Text>
+        </View>
+      )}
 
-              {currentStep.techniqueTag && (
-                <View style={[styles.techniqueCard, { backgroundColor: colors.surface }]}>
-                  <Text style={[styles.techniqueTitle, { color: colors.foreground }]}>
-                    Technique: {currentStep.techniqueTag.replace("_", " ")}
-                  </Text>
-                  <Text style={[styles.techniqueDesc, { color: colors.mutedForeground }]}>
-                    Master this technique to unlock the {currentStep.techniqueTag === "knife_work" ? "Knife Master" : "Sauce Expert"} badge!
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </ScrollView>
+      {/* Running score */}
+      <View style={[styles.runningScore, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.runningScoreLabel, { color: colors.mutedForeground }]}>Your score</Text>
+        <Text style={[styles.runningScoreValue, { color: colors.accent }]}>{sessionScore.toLocaleString()}</Text>
       </View>
     </View>
   );
 }
 
+function BetweenScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const { liveLeaderboard, sessionScore, nextQuestion, currentQuestionIndex, questions } = useQuizStore();
+
+  const isLastQuestion = currentQuestionIndex >= questions.length - 1;
+
+  // Auto-advance after 4 seconds
+  useEffect(() => {
+    const t = setTimeout(() => nextQuestion(), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const myEntry = liveLeaderboard.find((e) => e.isCurrentUser);
+
+  return (
+    <View style={[styles.betweenContainer, { backgroundColor: colors.background, paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }]}>
+      <Text style={[styles.betweenTitle, { color: colors.foreground }]}>After Q{currentQuestionIndex + 1}</Text>
+      <Text style={[styles.betweenSub, { color: colors.mutedForeground }]}>
+        {isLastQuestion ? "Final question! Leaderboard loading..." : `Next question in a moment…`}
+      </Text>
+
+      {myEntry && (
+        <View style={[styles.myScoreCard, { backgroundColor: `${colors.primary}18`, borderColor: colors.primary }]}>
+          <Text style={[styles.myScoreRank, { color: colors.primary }]}>#{myEntry.rank}</Text>
+          <View>
+            <Text style={[styles.myScoreLabel, { color: colors.mutedForeground }]}>Your rank</Text>
+            <Text style={[styles.myScoreVal, { color: colors.foreground }]}>{sessionScore.toLocaleString()} pts</Text>
+          </View>
+        </View>
+      )}
+
+      <MiniLeaderboard entries={liveLeaderboard} />
+
+      <TouchableOpacity
+        onPress={nextQuestion}
+        style={[styles.nextQBtn, { backgroundColor: colors.primary }]}
+      >
+        <Text style={styles.nextQBtnText}>
+          {isLastQuestion ? "See Final Results" : "Next Question"}
+        </Text>
+        <Feather name="arrow-right" size={17} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function CompleteScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const { liveLeaderboard, sessionScore, userAnswers, questions, participantCount, resetQuiz } = useQuizStore();
+  const { awardXP } = useGamificationStore();
+
+  const correctCount = userAnswers.filter((a) => a.isCorrect).length;
+  const myEntry = liveLeaderboard.find((e) => e.isCurrentUser);
+  const confettiAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    awardXP("QUIZ_COMPLETED", "Completed live quiz");
+    if (myEntry && myEntry.rank <= 10) awardXP("QUIZ_TOP_10", "Finished top 10!");
+    Animated.timing(confettiAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
+  }, []);
+
+  return (
+    <ScrollView
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={[
+        styles.completeContent,
+        { paddingTop: topPad + 16, paddingBottom: bottomPad + 80 },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Trophy header */}
+      <Animated.View style={[styles.trophySection, { opacity: confettiAnim }]}>
+        <View style={[styles.trophyIcon, { backgroundColor: `${colors.accent}22` }]}>
+          <Feather name="award" size={48} color={colors.accent} />
+        </View>
+        <Text style={[styles.completeTitle, { color: colors.foreground }]}>Quiz Complete!</Text>
+        <Text style={[styles.completeEpisode, { color: colors.mutedForeground }]}>
+          Italian Risotto Night · S3 E8
+        </Text>
+      </Animated.View>
+
+      {/* Your result */}
+      <View style={[styles.myResultCard, { backgroundColor: colors.surface }]}>
+        <View style={styles.myResultRow}>
+          <View style={styles.myResultStat}>
+            <Text style={[styles.myResultVal, { color: colors.accent, fontSize: 36 }]}>
+              #{myEntry?.rank ?? "—"}
+            </Text>
+            <Text style={[styles.myResultLabel, { color: colors.mutedForeground }]}>
+              of {participantCount.toLocaleString()}
+            </Text>
+          </View>
+          <View style={[styles.myResultDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.myResultStat}>
+            <Text style={[styles.myResultVal, { color: colors.foreground }]}>
+              {correctCount}/{questions.length}
+            </Text>
+            <Text style={[styles.myResultLabel, { color: colors.mutedForeground }]}>correct</Text>
+          </View>
+          <View style={[styles.myResultDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.myResultStat}>
+            <Text style={[styles.myResultVal, { color: colors.foreground }]}>
+              {sessionScore.toLocaleString()}
+            </Text>
+            <Text style={[styles.myResultLabel, { color: colors.mutedForeground }]}>pts</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Question-by-question review */}
+      <Text style={[styles.reviewTitle, { color: colors.foreground }]}>Question Review</Text>
+      <View style={styles.reviewList}>
+        {questions.map((q, idx) => {
+          const answer = userAnswers[idx];
+          const isCorrect = answer?.isCorrect;
+          const selectedOpt = q.options.find((o) => o.id === answer?.selectedOptionId);
+          const correctOpt = q.options.find((o) => o.id === q.correctOptionId);
+          return (
+            <View key={q.id} style={[styles.reviewCard, { backgroundColor: colors.surface }]}>
+              <View style={styles.reviewCardHeader}>
+                <View style={[styles.reviewQNum, { backgroundColor: isCorrect ? `${colors.success}22` : `${colors.danger}15` }]}>
+                  <Feather name={isCorrect ? "check" : "x"} size={12} color={isCorrect ? colors.success : colors.danger} />
+                </View>
+                <Text style={[styles.reviewQText, { color: colors.foreground }]} numberOfLines={2}>{q.text}</Text>
+              </View>
+              <View style={styles.reviewAnswers}>
+                {selectedOpt && !isCorrect && (
+                  <Text style={[styles.reviewYourAnswer, { color: colors.danger }]}>
+                    Your answer: {selectedOpt.label}. {selectedOpt.text}
+                  </Text>
+                )}
+                {!answer?.selectedOptionId && (
+                  <Text style={[styles.reviewYourAnswer, { color: colors.danger }]}>No answer — time ran out</Text>
+                )}
+                <Text style={[styles.reviewCorrect, { color: colors.success }]}>
+                  Correct: {correctOpt?.label}. {correctOpt?.text}
+                </Text>
+              </View>
+              <Text style={[styles.reviewPoints, { color: isCorrect ? colors.accent : colors.mutedForeground }]}>
+                {isCorrect ? `+${answer.pointsEarned.toLocaleString()} pts` : "0 pts"}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Full leaderboard */}
+      <Text style={[styles.reviewTitle, { color: colors.foreground }]}>Final Leaderboard</Text>
+      <MiniLeaderboard entries={liveLeaderboard} />
+
+      <TouchableOpacity
+        onPress={resetQuiz}
+        style={[styles.playAgainBtn, { backgroundColor: colors.primary }]}
+      >
+        <Feather name="rotate-cw" size={17} color="#fff" />
+        <Text style={styles.playAgainText}>Play Again</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// ─── Root screen ──────────────────────────────────────────────────────────────
+
+export default function QuizScreen() {
+  const { phase } = useQuizStore();
+
+  switch (phase) {
+    case "idle":      return <IdleScreen />;
+    case "countdown": return <CountdownScreen />;
+    case "question":
+    case "revealing": return <QuestionScreen />;
+    default:          break;
+  }
+
+  if (phase === "between") return <BetweenScreen />;
+  if (phase === "complete") return <CompleteScreen />;
+  return <IdleScreen />;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  videoSection: { position: "relative", overflow: "hidden" },
-  videoPlaceholder: { width: "100%", height: "100%" },
-  liveBadge: { position: "absolute", top: 60, left: 16, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  // Idle
+  idleContent: { paddingHorizontal: 20, gap: 16 },
+  eventCard: { height: 240, borderRadius: 22, overflow: "hidden", position: "relative" },
+  eventThumb: { width: "100%", height: "100%" },
+  eventCardOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, gap: 4 },
+  livePill: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 4 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
-  liveText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
-  videoOverlay: { position: "absolute", bottom: 24, left: 16, right: 16 },
-  episodeTitle: { color: "#fff", fontSize: 18, fontWeight: "700", textShadowColor: "rgba(0,0,0,0.8)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  chefName: { color: "rgba(255,255,255,0.7)", fontSize: 13, marginTop: 2 },
-  progressBar: { position: "absolute", bottom: 0, left: 0, right: 0, height: 3, backgroundColor: "rgba(255,255,255,0.2)" },
-  progressFill: { height: "100%", borderRadius: 2 },
-  progressLabel: { position: "absolute", bottom: 8, right: 16, fontSize: 11 },
-  bottomSection: {},
-  tabBar: { flexDirection: "row", borderBottomWidth: 1 },
-  tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12, flexDirection: "row", gap: 6 },
-  tabLabel: { fontSize: 14, fontWeight: "600" },
-  tabBadge: { width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  tabBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
-  tabContent: { flex: 1 },
-  tabContentInner: { padding: 16, gap: 16 },
-  stepsTab: { gap: 16 },
-  timerContainer: { borderRadius: 16, padding: 16, alignItems: "center", gap: 8 },
-  timerLabel: { fontSize: 12, fontWeight: "600", letterSpacing: 0.5 },
-  stepNav: { flexDirection: "row", gap: 12 },
-  navBtn: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
-  nextBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 52, borderRadius: 26 },
-  nextBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  ingredientsContainer: { borderRadius: 16, overflow: "hidden" },
-  ingredientsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, paddingBottom: 12 },
-  ingredientsTitle: { fontSize: 15, fontWeight: "700" },
-  checkedCount: { fontSize: 13 },
-  ingredientRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-  ingredientName: { flex: 1, fontSize: 15 },
-  ingredientQty: { fontSize: 13 },
-  optionalTag: { fontSize: 10, fontWeight: "600" },
-  tipsTab: { gap: 14 },
-  tipCard: { flexDirection: "row", gap: 14, padding: 16, borderRadius: 16, borderWidth: 1.5, alignItems: "flex-start" },
-  tipContent: { flex: 1, gap: 6 },
-  tipTitle: { fontSize: 13, fontWeight: "700" },
-  tipText: { fontSize: 15, lineHeight: 22 },
-  noTip: { alignItems: "center", paddingVertical: 40, gap: 12 },
-  noTipText: { fontSize: 15, textAlign: "center" },
-  techniqueCard: { borderRadius: 16, padding: 16, gap: 6 },
-  techniqueTitle: { fontSize: 14, fontWeight: "700" },
-  techniqueDesc: { fontSize: 13, lineHeight: 19 },
+  livePillText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  eventTitle: { color: "#fff", fontSize: 20, fontWeight: "800", lineHeight: 26 },
+  eventChef: { color: "rgba(255,255,255,0.7)", fontSize: 13 },
+  eventMeta: { flexDirection: "row", gap: 14, marginTop: 4 },
+  eventMetaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  eventMetaText: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
+  joinBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 18, borderRadius: 16 },
+  joinBtnText: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  hintCard: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
+  hintText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  pastSection: { gap: 12 },
+  pastTitle: { fontSize: 18, fontWeight: "700" },
+  pastCard: { borderRadius: 16, padding: 14, gap: 12 },
+  pastCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pastCardTitle: { fontSize: 14, fontWeight: "700", flex: 1 },
+  pastCardDate: { fontSize: 12 },
+  pastCardStats: { flexDirection: "row", gap: 8 },
+  pastStat: { flex: 1, alignItems: "center", gap: 2 },
+  pastStatVal: { fontSize: 20, fontWeight: "800", letterSpacing: -0.5 },
+  pastStatLabel: { fontSize: 11 },
+
+  // Countdown
+  fullCenter: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  countdownLabel: { fontSize: 18, fontWeight: "600" },
+  countdownNumber: { fontSize: 120, fontWeight: "900", letterSpacing: -4 },
+  countdownSub: { fontSize: 15 },
+
+  // Question
+  questionContent: { paddingHorizontal: 20, gap: 20 },
+  questionTopBar: { flexDirection: "row", alignItems: "center", gap: 12 },
+  qProgressPills: { flex: 1, flexDirection: "row", height: 6 },
+  progressPill: { height: 6, borderRadius: 3 },
+  timerRingWrap: { width: 72, height: 72, alignItems: "center", justifyContent: "center", position: "relative" },
+  timerNumber: { fontSize: 22, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  questionMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  categoryPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  categoryText: { fontSize: 11, fontWeight: "700" },
+  questionCounter: { fontSize: 13 },
+  questionText: { fontSize: 22, fontWeight: "700", lineHeight: 30 },
+  optionsGrid: { gap: 10 },
+  optionBtn: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 14, borderWidth: 2 },
+  optionLabel: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  optionLabelText: { fontSize: 14, fontWeight: "800" },
+  optionText: { flex: 1, fontSize: 15, fontWeight: "500", lineHeight: 21 },
+
+  // Revealing
+  revealContainer: { flex: 1, paddingHorizontal: 20, gap: 16 },
+  resultBanner: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 16, borderWidth: 1.5 },
+  resultTitle: { fontSize: 18, fontWeight: "800" },
+  resultSub: { fontSize: 13, marginTop: 2 },
+  pointsBurst: { fontSize: 22, fontWeight: "900" },
+  revealQuestion: { fontSize: 16, fontWeight: "600", lineHeight: 22 },
+  explanationBox: { flexDirection: "row", gap: 10, padding: 14, borderRadius: 14, borderLeftWidth: 3, alignItems: "flex-start" },
+  explanationText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  runningScore: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderRadius: 14 },
+  runningScoreLabel: { fontSize: 14 },
+  runningScoreValue: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+
+  // Between
+  betweenContainer: { flex: 1, paddingHorizontal: 20, gap: 16 },
+  betweenTitle: { fontSize: 22, fontWeight: "800" },
+  betweenSub: { fontSize: 14, marginTop: -8 },
+  myScoreCard: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 14, borderWidth: 1.5 },
+  myScoreRank: { fontSize: 32, fontWeight: "900", letterSpacing: -1 },
+  myScoreLabel: { fontSize: 12 },
+  myScoreVal: { fontSize: 20, fontWeight: "700" },
+  nextQBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 14, marginTop: 4 },
+  nextQBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  // Mini leaderboard
+  miniLb: { gap: 6 },
+  miniLbRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 12 },
+  miniLbRank: { width: 28, fontSize: 13, fontWeight: "700" },
+  miniLbName: { flex: 1, fontSize: 14, fontWeight: "600" },
+  miniLbScore: { fontSize: 15, fontWeight: "700" },
+  ellipsis: { textAlign: "center", fontSize: 16, letterSpacing: 4 },
+
+  // Complete
+  completeContent: { paddingHorizontal: 20, gap: 20 },
+  trophySection: { alignItems: "center", gap: 10 },
+  trophyIcon: { width: 100, height: 100, borderRadius: 50, alignItems: "center", justifyContent: "center" },
+  completeTitle: { fontSize: 28, fontWeight: "900" },
+  completeEpisode: { fontSize: 14 },
+  myResultCard: { borderRadius: 20, padding: 20 },
+  myResultRow: { flexDirection: "row", alignItems: "center" },
+  myResultStat: { flex: 1, alignItems: "center", gap: 3 },
+  myResultVal: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  myResultLabel: { fontSize: 11 },
+  myResultDivider: { width: 1, height: 50, marginHorizontal: 8 },
+  reviewTitle: { fontSize: 18, fontWeight: "700" },
+  reviewList: { gap: 10 },
+  reviewCard: { borderRadius: 14, padding: 14, gap: 10 },
+  reviewCardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  reviewQNum: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  reviewQText: { flex: 1, fontSize: 14, fontWeight: "600", lineHeight: 20 },
+  reviewAnswers: { gap: 4, paddingLeft: 34 },
+  reviewYourAnswer: { fontSize: 13 },
+  reviewCorrect: { fontSize: 13, fontWeight: "600" },
+  reviewPoints: { fontSize: 13, fontWeight: "700", textAlign: "right" },
+  playAgainBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 14 },
+  playAgainText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

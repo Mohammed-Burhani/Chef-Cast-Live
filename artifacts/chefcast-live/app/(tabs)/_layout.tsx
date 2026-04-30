@@ -70,9 +70,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="cook-along"
         options={{
-          title: "Cook",
+          title: "Live Quiz",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="play-circle" size={size - 2} color={color} />
+            <Feather name="zap" size={size - 2} color={color} />
           ),
         }}
       />
