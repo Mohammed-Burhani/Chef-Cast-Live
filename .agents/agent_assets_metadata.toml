@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "cNEkKAG5TZlG0g2OIgn-N"
+uri = "file://artifacts/chefcast-live/assets/images/icon.png"
+type = "image"
+title = "chefcast icon"
+
+[[generated]]
+id = "mLIVOIY0sZgyek-ke4Mbi"
+uri = "file://artifacts/chefcast-live/assets/images/hero_episode.png"
+type = "image"
+title = "hero episode"
+
+[[generated]]
+id = "W8Br_a78sutxhhXhpIXQB"
+uri = "file://artifacts/chefcast-live/assets/images/hero_dish.png"
+type = "image"
+title = "hero dish"

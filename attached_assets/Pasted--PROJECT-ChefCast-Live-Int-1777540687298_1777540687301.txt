@@ -1,0 +1,853 @@
+=====================================================================
+PROJECT: ChefCast: Live — Interactive Cooking Companion App
+ROLE: Senior Full-Stack React Native Engineer + UX Architect
+AUDIENCE: Beginner-friendly codebase; heavily commented, zero magic
+=====================================================================
+
+## MISSION STATEMENT
+Build a production-ready, cross-platform mobile application called
+"ChefCast: Live" — an interactive companion app for a live cooking TV
+series. The app transforms passive TV watching into an active,
+gamified, community-driven cooking experience.
+
+Core philosophy: "Watch. Cook. Connect."
+
+=====================================================================
+## TECH STACK — MANDATORY. DO NOT SUBSTITUTE.
+=====================================================================
+
+FRAMEWORK:
+- Expo SDK 52+ (managed workflow)
+- React Native 0.76+
+- Expo Router v3 (file-based routing, typed routes enabled)
+
+STYLING:
+- NativeWind v4 (Tailwind CSS for React Native)
+- React Native Reanimated v3 (animations)
+- React Native Gesture Handler v2
+
+BACKEND / DATABASE:
+- Supabase (Auth, PostgreSQL, Realtime, Storage, Edge Functions)
+- @supabase/supabase-js v2
+
+STATE MANAGEMENT:
+- Zustand v4 (global state slices)
+- TanStack Query v5 / React Query (server state, caching)
+
+NAVIGATION:
+- Expo Router v3 with typed routes
+- Bottom Tab Navigator + Stack Navigator via expo-router layouts
+
+FORMS & VALIDATION:
+- React Hook Form v7
+- Zod v3 (schema validation)
+
+MEDIA & HARDWARE:
+- expo-camera (fridge scanning + dish photo upload)
+- expo-av (video playback for cook-along)
+- expo-speech (voice commands — hands-free mode)
+- expo-image-picker
+- expo-barcode-scanner
+
+NOTIFICATIONS:
+- expo-notifications (push notifications for episode alerts)
+
+PAYMENTS / SUBSCRIPTIONS:
+- react-native-purchases (RevenueCat) for IAP + subscriptions
+
+UI COMPONENT LIBRARY:
+- @rn-primitives (accessible, unstyled primitives)
+- react-native-safe-area-context
+- react-native-fast-image (optimized image rendering)
+- react-native-skeleton-placeholder (loading states)
+- @gorhom/bottom-sheet (interactive bottom sheets)
+- react-native-toast-message (in-app toasts)
+
+UTILITIES:
+- date-fns (date formatting)
+- lodash-es (utility functions)
+- react-native-mmkv (ultra-fast local key-value storage)
+- @legendapp/timer (countdown timers)
+
+TESTING (scaffold only):
+- Jest + React Native Testing Library
+
+LINTING/FORMATTING:
+- ESLint + Prettier + TypeScript strict mode
+
+=====================================================================
+## PROJECT STRUCTURE — GENERATE THIS EXACT FOLDER LAYOUT
+=====================================================================
+
+chefcast-live/
+├── app/                          # Expo Router pages (file-based)
+│   ├── (auth)/
+│   │   ├── _layout.tsx
+│   │   ├── welcome.tsx
+│   │   ├── login.tsx
+│   │   └── signup.tsx
+│   ├── (tabs)/
+│   │   ├── _layout.tsx           # Bottom tab navigator
+│   │   ├── index.tsx             # Home / episode feed
+│   │   ├── cook-along.tsx        # Live cook-along screen
+│   │   ├── community.tsx         # Community feed + dish uploads
+│   │   ├── pantry.tsx            # Virtual pantry + badges
+│   │   └── profile.tsx           # User profile + settings
+│   ├── episode/
+│   │   └── [id].tsx              # Dynamic episode detail page
+│   ├── poll/
+│   │   └── [id].tsx              # Full-screen live poll
+│   ├── mystery-box.tsx           # Mystery box challenge screen
+│   ├── leaderboard.tsx           # Global + friends leaderboard
+│   ├── scanner.tsx               # Fridge ingredient scanner
+│   ├── ar-plating.tsx            # AR plating visualizer
+│   └── _layout.tsx               # Root layout (providers wrap)
+│
+├── components/
+│   ├── ui/                       # Reusable atomic components
+│   │   ├── Button.tsx
+│   │   ├── Card.tsx
+│   │   ├── Badge.tsx
+│   │   ├── Avatar.tsx
+│   │   ├── ProgressBar.tsx
+│   │   ├── Timer.tsx
+│   │   ├── IngredientCheckbox.tsx
+│   │   └── SkeletonLoader.tsx
+│   ├── cook-along/
+│   │   ├── SplitScreenLayout.tsx
+│   │   ├── StepCard.tsx
+│   │   ├── IngredientList.tsx
+│   │   └── CookTimer.tsx
+│   ├── polls/
+│   │   ├── LivePollCard.tsx
+│   │   └── PollResultBar.tsx
+│   ├── gamification/
+│   │   ├── BadgeCard.tsx
+│   │   ├── XPProgressRing.tsx
+│   │   ├── StreakFlame.tsx
+│   │   └── LeaderboardRow.tsx
+│   ├── community/
+│   │   ├── DishPhotoCard.tsx
+│   │   ├── QAThread.tsx
+│   │   └── MysteryBoxSubmit.tsx
+│   └── layout/
+│       ├── ScreenHeader.tsx
+│       ├── SafeScrollView.tsx
+│       └── VoiceCommandOverlay.tsx
+│
+├── lib/
+│   ├── supabase.ts               # Supabase client singleton
+│   ├── supabase-realtime.ts      # Realtime channel helpers
+│   ├── revenuecat.ts             # RevenueCat initialization
+│   └── voice-commands.ts         # Expo Speech command parser
+│
+├── store/
+│   ├── useAuthStore.ts           # Auth state (Zustand)
+│   ├── useCookAlongStore.ts      # Current step, timers, checklist
+│   ├── useGamificationStore.ts   # XP, badges, streaks
+│   └── usePollStore.ts           # Active poll state
+│
+├── hooks/
+│   ├── useSupabaseQuery.ts       # Typed TanStack Query + Supabase
+│   ├── useRealtimePoll.ts        # Subscribe to poll updates
+│   ├── useEpisodeRealtime.ts     # Subscribe to live episode events
+│   ├── useVoiceCommands.ts       # Voice recognition hook
+│   ├── useIngredientScanner.ts   # Camera + CV ingredient detection
+│   └── useStreak.ts              # Streak calculation + persistence
+│
+├── services/
+│   ├── episodeService.ts         # CRUD for episodes
+│   ├── pollService.ts            # Poll votes + results
+│   ├── recipeService.ts          # Recipe steps + ingredients
+│   ├── gamificationService.ts    # XP awards, badge unlock logic
+│   ├── leaderboardService.ts     # Score calculation
+│   └── communityService.ts       # Dish uploads, Q&A
+│
+├── types/
+│   ├── database.types.ts         # Auto-generated Supabase types
+│   ├── episode.ts
+│   ├── recipe.ts
+│   ├── poll.ts
+│   ├── user.ts
+│   └── gamification.ts
+│
+├── constants/
+│   ├── colors.ts                 # Brand color tokens
+│   ├── badges.ts                 # All badge definitions + unlock criteria
+│   ├── routes.ts                 # Typed route constants
+│   └── config.ts                 # Env vars, feature flags
+│
+├── assets/
+│   ├── images/
+│   ├── fonts/
+│   └── lottie/                   # Lottie animations for celebrations
+│
+├── supabase/
+│   ├── migrations/               # SQL migration files
+│   │   ├── 001_users.sql
+│   │   ├── 002_episodes.sql
+│   │   ├── 003_recipes.sql
+│   │   ├── 004_polls.sql
+│   │   ├── 005_gamification.sql
+│   │   └── 006_community.sql
+│   ├── functions/
+│   │   ├── calculate-leaderboard/
+│   │   │   └── index.ts
+│   │   ├── award-badge/
+│   │   │   └── index.ts
+│   │   └── ingredient-substitution/
+│   │       └── index.ts          # AI-powered ingredient matching
+│   └── seed.sql
+│
+├── tailwind.config.js
+├── app.json
+├── tsconfig.json
+└── .env.local
+
+=====================================================================
+## DATABASE SCHEMA — GENERATE ALL MIGRATIONS
+=====================================================================
+
+Generate the following PostgreSQL tables with Supabase RLS enabled:
+
+TABLE: profiles
+- id uuid (FK auth.users, PRIMARY KEY)
+- username text UNIQUE NOT NULL
+- display_name text
+- avatar_url text
+- xp_total integer DEFAULT 0
+- current_streak integer DEFAULT 0
+- longest_streak integer DEFAULT 0
+- last_cooked_at timestamptz
+- subscription_tier text DEFAULT 'free' -- 'free' | 'premium'
+- created_at timestamptz DEFAULT now()
+
+TABLE: episodes
+- id uuid PRIMARY KEY
+- title text NOT NULL
+- description text
+- thumbnail_url text
+- video_url text
+- broadcast_at timestamptz
+- is_live boolean DEFAULT false
+- chef_name text
+- season integer
+- episode_number integer
+- created_at timestamptz DEFAULT now()
+
+TABLE: recipes
+- id uuid PRIMARY KEY
+- episode_id uuid FK episodes
+- title text NOT NULL
+- description text
+- difficulty text -- 'easy' | 'medium' | 'hard'
+- prep_time_minutes integer
+- cook_time_minutes integer
+- servings integer DEFAULT 4
+- created_at timestamptz DEFAULT now()
+
+TABLE: ingredients
+- id uuid PRIMARY KEY
+- recipe_id uuid FK recipes
+- name text NOT NULL
+- quantity text
+- unit text
+- is_optional boolean DEFAULT false
+- substitutes jsonb -- array of substitute options
+- step_number integer -- which step this ingredient is first used
+
+TABLE: recipe_steps
+- id uuid PRIMARY KEY
+- recipe_id uuid FK recipes
+- step_number integer NOT NULL
+- instruction text NOT NULL
+- duration_seconds integer -- auto-timer trigger
+- technique_tag text -- e.g. 'knife_work', 'sauce', 'plating'
+- tip text -- optional chef tip
+
+TABLE: polls
+- id uuid PRIMARY KEY
+- episode_id uuid FK episodes
+- question text NOT NULL
+- options jsonb -- [{id, label, votes}]
+- is_active boolean DEFAULT false
+- winner_option_id text -- populated when poll closes
+- created_at timestamptz DEFAULT now()
+- closes_at timestamptz
+
+TABLE: poll_votes
+- id uuid PRIMARY KEY
+- poll_id uuid FK polls
+- user_id uuid FK profiles
+- option_id text NOT NULL
+- voted_at timestamptz DEFAULT now()
+- UNIQUE(poll_id, user_id)
+
+TABLE: badges
+- id uuid PRIMARY KEY
+- slug text UNIQUE NOT NULL
+- name text NOT NULL
+- description text
+- icon_url text
+- xp_reward integer DEFAULT 50
+- unlock_criteria jsonb -- conditions object for server-side check
+
+TABLE: user_badges
+- id uuid PRIMARY KEY
+- user_id uuid FK profiles
+- badge_id uuid FK badges
+- earned_at timestamptz DEFAULT now()
+- UNIQUE(user_id, badge_id)
+
+TABLE: user_cook_sessions
+- id uuid PRIMARY KEY
+- user_id uuid FK profiles
+- episode_id uuid FK episodes
+- recipe_id uuid FK recipes
+- completed_steps integer[] DEFAULT '{}'
+- completed boolean DEFAULT false
+- dish_photo_url text
+- started_at timestamptz DEFAULT now()
+- completed_at timestamptz
+- score integer DEFAULT 0
+
+TABLE: community_posts
+- id uuid PRIMARY KEY
+- user_id uuid FK profiles
+- episode_id uuid FK episodes
+- recipe_id uuid FK recipes
+- photo_url text NOT NULL
+- caption text
+- likes integer DEFAULT 0
+- created_at timestamptz DEFAULT now()
+
+TABLE: qa_questions
+- id uuid PRIMARY KEY
+- user_id uuid FK profiles
+- episode_id uuid FK episodes
+- question text NOT NULL
+- is_answered boolean DEFAULT false
+- is_selected_for_broadcast boolean DEFAULT false
+- answer text
+- upvotes integer DEFAULT 0
+- created_at timestamptz DEFAULT now()
+
+TABLE: mystery_box_submissions
+- id uuid PRIMARY KEY
+- user_id uuid FK profiles
+- episode_id uuid FK episodes
+- mystery_ingredient text NOT NULL
+- dish_idea text NOT NULL
+- is_featured_on_tv boolean DEFAULT false
+- submitted_at timestamptz DEFAULT now()
+
+TABLE: leaderboard_scores
+- id uuid PRIMARY KEY
+- user_id uuid FK profiles
+- episode_id uuid FK episodes
+- score integer DEFAULT 0
+- rank integer
+- breakdown jsonb -- {speed, accuracy, engagement, streak_bonus}
+- calculated_at timestamptz DEFAULT now()
+
+RLS POLICIES TO GENERATE:
+- profiles: users can read all, update only their own
+- poll_votes: users can insert once per poll, read all
+- user_badges: users can read all, only edge functions can insert
+- community_posts: authenticated users can insert, all can read
+- user_cook_sessions: users can CRUD only their own
+- qa_questions: authenticated can insert, all can read
+- mystery_box_submissions: authenticated can insert, all can read
+
+Enable Realtime on: polls, poll_votes, episodes, qa_questions
+
+=====================================================================
+## SCREEN-BY-SCREEN IMPLEMENTATION SPECS
+=====================================================================
+
+--- SCREEN 1: WELCOME / ONBOARDING (app/(auth)/welcome.tsx) ---
+- Full-screen animated splash with ChefCast logo
+- "What's your cooking level?" onboarding question (Beginner / Home Cook / Enthusiast)
+- Preference selection: cuisine types (Italian, Asian, Mexican, etc.)
+- CTA: "Start Cooking" → sign up, "I have an account" → login
+- Store preferences to profiles table after auth
+
+--- SCREEN 2: HOME FEED (app/(tabs)/index.tsx) ---
+- Sticky header with greeting ("Good evening, [name]! 🔥 3-day streak")
+- "LIVE NOW" banner card (red pulsing dot) if episode.is_live === true
+- Upcoming episodes horizontal scroll row with countdown timers
+- "Your Progress" section: XP ring, current badge count, streak flame
+- "Community Highlights" section: top 3 community dish photos
+- "Mystery Box Active" banner if a mystery box challenge is live
+- Pull-to-refresh with React Query invalidation
+- Skeleton loaders for all async sections
+
+--- SCREEN 3: COOK-ALONG MODE (app/(tabs)/cook-along.tsx) ---
+SPLIT-SCREEN LAYOUT:
+  TOP HALF (60%):
+  - expo-av Video component showing live/VOD episode stream
+  - Floating live indicator badge
+  - Tap to show/hide video controls overlay
+
+  BOTTOM HALF (40%) — Swipeable tabs:
+  TAB A: STEPS
+  - Active step card highlighted in brand color
+  - Step instruction text, large and readable
+  - Auto-timer: when step has duration_seconds, show countdown ring
+  - "Next Step" / "Previous Step" swipe gestures + buttons
+  - Ingredient callout chips for step-specific ingredients
+  - Progress bar showing step X of Y
+
+  TAB B: INGREDIENTS
+  - Full ingredient checklist
+  - IngredientCheckbox component: tap to strikethrough when prepped
+  - Color coding: available (green) / missing (amber) / optional (gray)
+  - "Order Missing Items" button → deep links to Instacart/DoorDash
+
+  TAB C: TIPS
+  - Chef tips for current step
+  - Technique badge opportunity alerts ("Complete this step to earn Knife Master!")
+
+COOK-ALONG INTERACTIONS:
+  - Floating microphone FAB for voice commands
+  - Voice commands: "next step", "start timer", "add [ingredient] to shopping list", "pause", "what do I need"
+  - Haptic feedback (expo-haptics) on step completion
+
+--- SCREEN 4: LIVE POLLS (component + modal) ---
+- Triggered via Supabase Realtime when poll.is_active changes to true
+- Slides up from bottom as a @gorhom/bottom-sheet
+- Poll question displayed prominently
+- Option buttons with animated result bars (fill % after voting)
+- Confetti animation if user voted for winning option
+- Poll closes automatically at closes_at timestamp
+- User earns +10 XP for each poll participation
+- Results persist in real-time using Supabase Realtime broadcast
+
+--- SCREEN 5: COMMUNITY FEED (app/(tabs)/community.tsx) ---
+- Masonry grid layout of dish photos (react-native-masonry-list)
+- Each DishPhotoCard shows: photo, username, episode name, like count
+- Heart animation on like (React Native Reanimated spring)
+- Filter bar: "This Episode" | "All Time" | "Following"
+- FAB: "Share my dish" → opens camera or photo picker
+- Upload flow: take/select photo → add caption → tag episode → submit
+  - Photo stored in Supabase Storage bucket: 'dish-photos'
+  - Public URL saved to community_posts table
+- Q&A section below feed: show open questions, upvote button
+- "Ask the Chef" input: text field + submit → saved to qa_questions
+
+--- SCREEN 6: VIRTUAL PANTRY & GAMIFICATION (app/(tabs)/pantry.tsx) ---
+SECTIONS:
+  A. BADGES COLLECTION
+  - Grid of all badges (locked = grayscale + lock icon, unlocked = full color)
+  - Badge slugs: knife_master, sauce_expert, speed_demon, streak_3,
+    streak_7, streak_30, mystery_winner, community_star, poll_voter,
+    first_cook, perfect_plate, early_bird
+  - Tap badge → bottom sheet with: name, description, unlock progress,
+    XP reward, date earned (if unlocked)
+
+  B. XP & LEVEL SYSTEM
+  - Animated circular progress ring showing XP toward next level
+  - Level thresholds: 0 XP = Prep Cook, 500 = Home Cook,
+    1500 = Sous Chef, 3000 = Head Chef, 6000 = Executive Chef,
+    10000 = Master Chef
+  - XP log: scrollable list of recent XP earning events
+
+  C. STREAK TRACKER
+  - Calendar heatmap (react-native-calendars) showing cook days
+  - Current streak with flame animation
+  - Streak protection: "Freeze" option using streak_freeze item (premium)
+
+  D. VIRTUAL PANTRY
+  - List of ingredients user has marked as "in my fridge" from scanner
+  - Stored locally via MMKV + synced to profiles.pantry_items jsonb column
+  - "Scan Fridge" button → navigates to scanner.tsx
+
+--- SCREEN 7: FRIDGE SCANNER (app/scanner.tsx) ---
+- expo-camera full-screen camera view
+- Overlay UI: scanning reticle, "Point at your ingredients" label
+- On capture: send image to Supabase Edge Function 'ingredient-detection'
+  (Edge Function uses Claude claude-haiku-4-5 via Anthropic API to identify
+   ingredients from the image and return a JSON array)
+- Detected ingredients list slides up from bottom
+- User confirms / deselects items
+- "Find Substitutes" button: calls edge function 'ingredient-substitution'
+  which cross-references against current episode's recipe ingredients
+- Shows recipe compatibility: "You have 8/12 ingredients for tonight's episode"
+- Missing items shown with substitute suggestions
+- "Add to Shopping List" saves to user's MMKV + Supabase profile
+
+--- SCREEN 8: AR PLATING VISUALIZER (app/ar-plating.tsx) ---
+NOTE: Full ARKit/ARCore not available in Expo managed workflow.
+Implement a HYBRID approach:
+- Use expo-camera for live camera feed as background
+- Overlay a semi-transparent plating guide PNG/SVG on top of camera feed
+  (react-native-svg overlay positioned with absolute layout)
+- Plating guides fetched from Supabase Storage per episode
+- User can:
+  - Toggle guide opacity (slider)
+  - Switch between 2-3 plating style variants
+  - Take photo of their plated dish (saves to community)
+- Label it clearly as "Plating Guide" (not full AR) with note that
+  full AR features available in premium version
+
+--- SCREEN 9: LEADERBOARD (app/leaderboard.tsx) ---
+- Two tabs: "This Episode" | "All-Time"
+- Each tab has sub-tabs: "Global" | "Friends"
+- Current user's rank pinned at bottom with highlight
+- Animated rank changes (slide up/down) using Reanimated
+- Score breakdown on tap: speed points + accuracy + engagement + streak bonus
+- Top 3 users get gold/silver/bronze animated crown badges
+- Refresh triggers recalculation via Supabase Edge Function
+
+--- SCREEN 10: MYSTERY BOX CHALLENGE (app/mystery-box.tsx) ---
+- Unlocks when episode has an active mystery_box event
+- Full-screen dramatic reveal animation (Lottie animation)
+- Shows the mystery ingredient with a 10:00 countdown timer
+- Large text input: "Describe your dish idea"
+- Character counter, max 280 characters
+- Submit button → saves to mystery_box_submissions
+- +50 XP for submission, +200 XP if featured on TV
+- "Featured submissions" section shows all submissions for that episode
+- Real-time updates via Supabase Realtime broadcast
+
+--- SCREEN 11: PROFILE (app/(tabs)/profile.tsx) ---
+- Avatar, display name, level badge
+- Stats row: Total episodes cooked | Badges earned | Total XP | Best streak
+- "Edit Profile" → bottom sheet with name + avatar change
+- Subscription status card: Free / Premium
+- "Upgrade to Premium" CTA if on free tier
+- Settings list: Notifications, Dark/Light mode, Voice commands toggle,
+  Units (metric/imperial), Privacy settings, Logout
+- "My Cook History" → FlatList of past cook sessions with photos
+
+=====================================================================
+## REAL-TIME ARCHITECTURE — SUPABASE REALTIME
+=====================================================================
+
+CHANNEL: episode:{episode_id}
+  Events to subscribe:
+  - poll_activated → show poll bottom sheet
+  - poll_closed → dismiss sheet, show results
+  - mystery_box_revealed → trigger mystery box animation
+  - chef_answered_qa → toast notification
+  - live_started → update episode is_live badge
+
+CHANNEL: leaderboard:{episode_id}
+  Events to subscribe:
+  - score_update → refresh own rank display
+
+CHANNEL: community:{episode_id}
+  Events to subscribe:
+  - new_post → append to community feed in real-time
+
+Generate useEpisodeRealtime.ts hook that:
+1. Creates/joins the episode channel on mount
+2. Returns typed event callbacks via Zustand setters
+3. Cleans up channel subscription on unmount
+
+=====================================================================
+## GAMIFICATION LOGIC — GENERATE FULL IMPLEMENTATION
+=====================================================================
+
+XP EVENTS (define in constants/gamification.ts):
+- COOK_SESSION_COMPLETED = 100 XP
+- POLL_VOTED = 10 XP
+- STEP_COMPLETED = 5 XP
+- DISH_PHOTO_UPLOADED = 25 XP
+- QA_QUESTION_SUBMITTED = 15 XP
+- MYSTERY_BOX_SUBMITTED = 50 XP
+- MYSTERY_BOX_FEATURED = 200 XP
+- STREAK_3_DAYS = 75 XP bonus
+- STREAK_7_DAYS = 200 XP bonus
+- STREAK_30_DAYS = 1000 XP bonus
+- BADGE_EARNED = badge.xp_reward XP
+
+BADGE UNLOCK CRITERIA (edge function: award-badge/index.ts):
+- knife_master: complete any 5 steps tagged 'knife_work'
+- sauce_expert: complete any 5 steps tagged 'sauce'
+- speed_demon: complete a cook session in under 80% of estimated time
+- streak_3 / streak_7 / streak_30: cook N days in a row
+- mystery_winner: have a mystery box submission featured on TV
+- community_star: receive 50 total likes on dish photos
+- poll_voter: vote in 10 polls
+- first_cook: complete first cook session
+- perfect_plate: upload a photo AND complete all steps
+
+STREAK LOGIC (hooks/useStreak.ts):
+- Streak increments when user completes a cook session on a new calendar day
+- Streak resets to 0 if no session completed in last 48 hours
+- Streak freeze items (premium): prevent reset once per 7 days
+- Read/write streak to both MMKV (offline) and Supabase profiles (sync)
+
+SCORE CALCULATION for leaderboard:
+  base_score = steps_completed * 10
+  speed_bonus = max(0, (expected_duration - actual_duration) / 60) * 5
+  accuracy_bonus = poll_votes_cast * 10
+  engagement_bonus = (questions_asked + photo_uploaded ? 25 : 0)
+  streak_multiplier = 1 + (current_streak * 0.05) — cap at 2.0
+  final_score = (base_score + speed_bonus + accuracy_bonus + engagement_bonus)
+                * streak_multiplier
+
+=====================================================================
+## VOICE COMMAND SYSTEM — GENERATE FULL IMPLEMENTATION
+=====================================================================
+
+In lib/voice-commands.ts define a command parser using expo-speech
+and @react-native-voice/voice:
+
+Commands to recognize (case-insensitive, fuzzy match):
+- "next step" → useCookAlongStore.nextStep()
+- "previous step" / "go back" → useCookAlongStore.prevStep()
+- "start timer" / "begin timer" → useCookAlongStore.startTimer()
+- "pause" / "pause timer" → useCookAlongStore.pauseTimer()
+- "how long" / "time remaining" → speak remaining time
+- "ingredients" → switch to ingredients tab
+- "tips" / "chef tip" → switch to tips tab
+- "add [ingredient] to shopping list" → parse ingredient + add to list
+- "what do I need" → speak list of unchecked ingredients
+- "I'm done" / "step done" → complete current step + award XP
+
+Generate VoiceCommandOverlay component:
+- Floating microphone FAB (bottom right)
+- Pulsing red animation when listening
+- Transcript shown in dismissible toast
+- Haptic confirmation on command recognized
+
+=====================================================================
+## NOTIFICATIONS — GENERATE FULL IMPLEMENTATION
+=====================================================================
+
+Notification types (handle in app/_layout.tsx via useEffect):
+- EPISODE_STARTING_SOON: 30 min before broadcast_at
+  → "New ChefCast episode starts in 30 minutes! 🍳 Prep your ingredients"
+- EPISODE_LIVE_NOW: when episode.is_live flips to true
+  → "ChefCast is LIVE! Join the cook-along now 🔴"
+- STREAK_REMINDER: daily at 7pm if no session today
+  → "Don't break your [N]-day streak! Tonight's episode starts at 8pm 🔥"
+- BADGE_EARNED: immediate on badge unlock
+  → "You earned the [Badge Name] badge! +[XP] XP 🏆"
+- MYSTERY_BOX_ACTIVE: when mystery box challenge activates
+  → "Mystery ingredient revealed! You have 10 minutes ⏱️"
+
+Use expo-notifications to schedule local notifications and
+handle remote push via Supabase Edge Function + Expo Push API.
+
+=====================================================================
+## SUBSCRIPTION / MONETISATION LAYER
+=====================================================================
+
+Using RevenueCat (react-native-purchases):
+
+PRODUCTS to define:
+- com.chefcast.premium.monthly ($4.99/mo)
+- com.chefcast.premium.annual ($39.99/yr — "Best Value")
+- com.chefcast.ingredientkit.weekly (variable price, delivery partnership)
+
+PREMIUM FEATURES (gate with subscription_tier check):
+- Ad-free experience
+- Early recipe access (48h before broadcast)
+- Exclusive masterclass content
+- Streak freeze items (2 per month)
+- HD video quality for cook-along
+- AR Plating advanced mode
+
+PAYWALL SCREEN:
+- Generate a dedicated paywall bottom sheet
+- Show feature comparison: Free vs Premium
+- Monthly / Annual toggle with annual savings callout
+- Integrate RevenueCat purchasePackage() with loading + error states
+- Handle restore purchases
+
+=====================================================================
+## INGREDIENT SCANNER — SUPABASE EDGE FUNCTION
+=====================================================================
+
+Generate supabase/functions/ingredient-detection/index.ts:
+
+1. Receive base64 image from client
+2. Call Anthropic API (claude-haiku-4-5 model) with vision:
+   Prompt: "Analyze this image of a refrigerator or kitchen counter.
+   List all visible food ingredients as a JSON array of objects:
+   [{name: string, quantity_estimate: string, confidence: 'high'|'medium'|'low'}]
+   Return ONLY valid JSON, no markdown."
+3. Parse response, return ingredients array
+4. Client displays detected ingredients for user confirmation
+
+Generate supabase/functions/ingredient-substitution/index.ts:
+1. Receive user_ingredients[] and recipe_ingredients[]
+2. Use Anthropic API to suggest substitutes for missing items
+3. Return: {available: [], missing: [], substitutes: [{missing, substitute, notes}]}
+
+=====================================================================
+## UI DESIGN SYSTEM — NATIVEWIND THEME
+=====================================================================
+
+In tailwind.config.js, extend the theme with these brand tokens:
+
+colors:
+  brand:
+    primary: '#E8572A'     -- Warm ember orange (main brand)
+    secondary: '#1A1A2E'   -- Deep midnight navy
+    accent: '#F5A623'      -- Golden saffron
+    dark: '#0D0D0D'        -- Near-black for dark mode bg
+    surface: '#1C1C2E'     -- Card surface in dark mode
+    muted: '#6B7280'       -- Muted text
+    success: '#22C55E'
+    warning: '#F59E0B'
+    danger: '#EF4444'
+    live: '#FF3B3B'        -- Live broadcast red
+
+Default to DARK MODE as the primary theme (kitchen lighting context).
+
+Typography scale:
+  - Display: font-size 32 (episode titles)
+  - Heading: font-size 22 (screen titles)
+  - Subheading: font-size 18
+  - Body: font-size 16
+  - Caption: font-size 13
+  - Micro: font-size 11
+
+Custom font: Load "Poppins" via expo-font
+  - PoppinsRegular, PoppinsMedium, PoppinsSemiBold, PoppinsBold
+
+SPACING SYSTEM: Use Tailwind default 4px base (p-4 = 16px)
+
+COMPONENT STYLE PATTERNS:
+  Card: bg-surface rounded-2xl p-4 border border-white/10
+  Button Primary: bg-brand-primary rounded-xl py-4 px-6 font-semibold
+  Button Ghost: border border-white/20 rounded-xl py-4 px-6
+  Badge: rounded-full px-3 py-1 text-xs font-medium
+  Input: bg-white/10 rounded-xl px-4 py-3 text-white border border-white/20
+  Tab Active: border-b-2 border-brand-primary text-brand-primary
+  Tab Inactive: text-muted
+
+=====================================================================
+## ANIMATIONS — REACT NATIVE REANIMATED V3
+=====================================================================
+
+Generate these specific animations:
+
+1. XP_AWARD_ANIMATION: Float "+X XP" text upward and fade out
+   - Triggered after any XP earning event
+   - Spring physics, 600ms, yellow color
+
+2. BADGE_UNLOCK_ANIMATION: Full-screen modal celebration
+   - Badge scales from 0 to 1.1 to 1.0 (spring bounce)
+   - Particle burst using react-native-confetti-cannon
+   - "Lottie" trophy animation overlay
+
+3. STREAK_FLAME_ANIMATION: Pulsing flame with color shift
+   - Idle: slow pulse (scale 0.95-1.05)
+   - Active/earned: fast pulse + orange-to-yellow color shift
+
+4. POLL_RESULT_BAR: Width expands from 0 to X% over 800ms
+   - Linear easing, staggered by 100ms per option
+
+5. LIVE_PULSE: Red dot pulsing ring for live indicators
+   - Opacity 1→0 with scale 1→2, repeating, 1500ms
+
+6. COOK_STEP_TRANSITION: Step card slides in from right
+   - translateX: 300→0, spring damping 15
+
+7. SCORE_TICKER: Numbers count up from 0 to final score
+   - 1200ms duration using Animated.timing on a shared value
+
+=====================================================================
+## ERROR HANDLING & OFFLINE SUPPORT
+=====================================================================
+
+- All Supabase calls wrapped in try/catch with typed error handling
+- Network state detection via @react-native-community/netinfo
+- Offline mode: MMKV stores last-fetched recipe steps + ingredients
+- Cook-along mode works fully offline once episode data is loaded
+- Optimistic updates for: poll votes, step completions, likes
+- Error boundaries around each major screen section
+- react-native-toast-message for user-facing error feedback
+- Sentry integration (expo-sentry) for crash reporting
+
+=====================================================================
+## ACCESSIBILITY
+=====================================================================
+
+- All interactive elements have accessibilityLabel and accessibilityHint
+- Minimum touch target size: 44x44px
+- VoiceOver / TalkBack compatible
+- High contrast text ratios maintained
+- Reduce motion: check useReducedMotion(), disable animations if true
+- Font scaling: all text uses allowFontScaling={true}
+
+=====================================================================
+## ENVIRONMENT VARIABLES (.env.local)
+=====================================================================
+
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_REVENUECAT_API_KEY_IOS=your_revenuecat_ios_key
+EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=your_revenuecat_android_key
+EXPO_PUBLIC_APP_ENV=development
+ANTHROPIC_API_KEY=your_anthropic_key  (server-side only, in Edge Functions)
+
+=====================================================================
+## BEGINNER-FRIENDLY CODE REQUIREMENTS
+=====================================================================
+
+1. EVERY file must start with a JSDoc comment explaining its purpose
+2. EVERY function must have a comment explaining what it does
+3. EVERY Supabase query must have an inline comment explaining the SQL intent
+4. EVERY Zustand store must have a comment on each slice of state
+5. Use descriptive variable names (no single-letter variables except loop indices)
+6. Separate business logic from UI: no raw Supabase calls inside components
+7. Use custom hooks for ALL data fetching — never fetch directly in a component
+8. Export all types from types/ — never use inline 'any' types
+9. Add a README.md per major folder explaining what goes in it
+10. Generate a root README.md with:
+    - Project overview
+    - Setup instructions (step-by-step)
+    - Environment variable guide
+    - Supabase setup guide
+    - Running the app locally
+    - Folder structure explanation
+
+=====================================================================
+## GENERATION ORDER — FOLLOW THIS SEQUENCE
+=====================================================================
+
+Generate in this exact order to avoid import errors:
+
+1. types/ — all TypeScript interfaces first
+2. constants/ — colors, badges, config, routes
+3. lib/ — supabase.ts client, helper singletons
+4. store/ — all Zustand stores
+5. services/ — all service files
+6. hooks/ — all custom hooks
+7. components/ui/ — atomic components
+8. components/ feature folders — cook-along, polls, gamification, community
+9. app/(auth)/ — auth screens
+10. app/(tabs)/ — main tab screens
+11. app/ — remaining screens (episode, scanner, ar-plating, etc.)
+12. supabase/migrations/ — all SQL files
+13. supabase/functions/ — Edge Functions
+14. tailwind.config.js, app.json, tsconfig.json
+15. Root README.md
+
+=====================================================================
+## FINAL INSTRUCTION TO AI IDE
+=====================================================================
+
+- Generate COMPLETE, RUNNABLE code for every file. No placeholder comments
+  like "// implement this later" or "// TODO".
+- If a third-party API requires an API key, add a clear ENV variable
+  reference and a comment explaining where to get it.
+- Do not hallucinate library APIs. If unsure about an Expo SDK method,
+  use the most conservative, documented approach.
+- Prefer functional components + hooks over class components.
+- Use TypeScript strict mode throughout. Zero 'any' types.
+- Every screen must handle: loading state, error state, empty state,
+  and success state.
+- Mobile-first, thumb-friendly UI: primary actions in bottom 40% of screen.
+- Test the logic, not just the UI: include at minimum one unit test
+  file per service in services/__tests__/.
+
+=====================================================================
+BEGIN GENERATION.
+=====================================================================
