@@ -11,6 +11,7 @@ import {
   Poppins_700Bold,
   useFonts,
 } from "@expo-google-fonts/poppins";
+import { Feather, AntDesign, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -47,6 +48,11 @@ export default function RootLayout() {
   const { isLoggedIn, isOnboarded, loading, loadFromStorage } = useAuthStore();
 
   const [fontsLoaded, fontError] = useFonts({
+    // Explicitly load icon fonts so Android resolves them correctly
+    ...Feather.font,
+    ...AntDesign.font,
+    ...Ionicons.font,
+    ...MaterialIcons.font,
     Poppins_400Regular,
     Poppins_500Medium,
     Poppins_600SemiBold,
