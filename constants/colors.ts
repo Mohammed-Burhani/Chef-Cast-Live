@@ -35,6 +35,7 @@ const colors = {
 
     surface: "#1C1C2E",
     live: "#FF3B3B",
+    neonRed: "#FF1744",
     success: "#22C55E",
     warning: "#F59E0B",
     danger: "#EF4444",
@@ -70,6 +71,7 @@ const colors = {
 
     surface: "#1C1C2E",
     live: "#FF3B3B",
+    neonRed: "#FF1744",
     success: "#22C55E",
     warning: "#F59E0B",
     danger: "#EF4444",

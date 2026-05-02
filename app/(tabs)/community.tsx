@@ -104,7 +104,7 @@ export default function CommunityScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.foreground }]}>Community</Text>
-          <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.neonRed }]}>
             <Feather name="camera" size={16} color="#fff" />
             <Text style={styles.shareBtnText}>Share Dish</Text>
           </TouchableOpacity>
@@ -161,8 +161,8 @@ export default function CommunityScreen() {
                     </Text>
                   ) : null}
                   <TouchableOpacity onPress={() => handleLike(post.id)} style={styles.likeRow}>
-                    <Feather name="heart" size={13} color={post.isLiked ? colors.live : colors.mutedForeground} />
-                    <Text style={[styles.likeCount, { color: post.isLiked ? colors.live : colors.mutedForeground }]}>
+                    <Feather name="heart" size={13} color={post.isLiked ? colors.neonRed : colors.mutedForeground} />
+                    <Text style={[styles.likeCount, { color: post.isLiked ? colors.neonRed : colors.mutedForeground }]}>
                       {post.likes}
                     </Text>
                   </TouchableOpacity>
@@ -194,8 +194,8 @@ export default function CommunityScreen() {
                     </Text>
                   ) : null}
                   <TouchableOpacity onPress={() => handleLike(post.id)} style={styles.likeRow}>
-                    <Feather name="heart" size={13} color={post.isLiked ? colors.live : colors.mutedForeground} />
-                    <Text style={[styles.likeCount, { color: post.isLiked ? colors.live : colors.mutedForeground }]}>
+                    <Feather name="heart" size={13} color={post.isLiked ? colors.neonRed : colors.mutedForeground} />
+                    <Text style={[styles.likeCount, { color: post.isLiked ? colors.neonRed : colors.mutedForeground }]}>
                       {post.likes}
                     </Text>
                   </TouchableOpacity>

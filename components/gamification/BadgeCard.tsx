@@ -66,7 +66,7 @@ export function BadgeCard({ badge, onPress }: BadgeCardProps) {
       >
         <Feather
           name={iconName}
-          size={24}
+          size={22}
           color={badge.isUnlocked ? colors.primary : colors.mutedForeground}
         />
         {!badge.isUnlocked && (
@@ -113,18 +113,17 @@ export function BadgeCard({ badge, onPress }: BadgeCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
-    maxWidth: "48%",
-    borderRadius: 16,
-    padding: 14,
+    width: "31%",
+    borderRadius: 14,
+    padding: 12,
     alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+    gap: 7,
+    marginBottom: 10,
   },
   iconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
@@ -140,10 +139,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   name: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 14,
   },
   progressTrack: {
     width: "100%",

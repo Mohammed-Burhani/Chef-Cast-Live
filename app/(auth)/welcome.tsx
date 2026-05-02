@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/Button";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/useAuthStore";
+import { UserProfile } from "@/types";
 
 const COOKING_LEVELS = [
   { id: "beginner", label: "Beginner", desc: "Just getting started", icon: "smile" as const },
@@ -31,13 +32,20 @@ const COOKING_LEVELS = [
 
 const CUISINES = ["Italian", "Asian", "Mexican", "French", "Indian", "American", "Mediterranean", "Japanese"];
 
+const GENDERS = [
+  { value: "male" as const, label: "Male", icon: "user" as const },
+  { value: "female" as const, label: "Female", icon: "user" as const },
+  { value: "other" as const, label: "Other", icon: "users" as const },
+];
+
 export default function WelcomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
+  const { completeOnboarding, login } = useAuthStore();
   const [step, setStep] = useState(0);
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
+  const [selectedGender, setSelectedGender] = useState<"male" | "female" | "other" | null>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
@@ -50,10 +58,37 @@ export default function WelcomeScreen() {
   const handleNext = async () => {
     if (step === 0 && selectedLevel) {
       setStep(1);
-    } else if (step === 1) {
+    } else if (step === 1 && selectedCuisines.length > 0) {
+      setStep(2);
+    } else if (step === 2 && selectedGender) {
       await completeOnboarding();
       router.replace("/(auth)/signup");
     }
+  };
+
+  const handleAnonymousSignin = async () => {
+    if (step === 0 && !selectedLevel) return;
+    if (step === 1 && selectedCuisines.length === 0) return;
+    if (step === 2 && !selectedGender) return;
+
+    // Create anonymous user
+    const anonUser: UserProfile = {
+      id: `anon-${Date.now()}`,
+      username: `chef_${Math.random().toString(36).substr(2, 6)}`,
+      displayName: "Anonymous Chef",
+      gender: selectedGender || "other",
+      xpTotal: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      subscriptionTier: "free",
+      cookingLevel: (selectedLevel as any) || "beginner",
+      cuisinePreferences: selectedCuisines,
+      createdAt: new Date().toISOString(),
+    };
+
+    await completeOnboarding();
+    await login(anonUser);
+    router.replace("/(tabs)");
   };
 
   return (
@@ -69,29 +104,31 @@ export default function WelcomeScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: topPadding + 20,
-            paddingBottom: insets.bottom + 40,
+            paddingTop: topPadding + 16,
+            paddingBottom: insets.bottom + 60,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Logo */}
         <View style={styles.logoArea}>
-          <View style={[styles.logoCircle, { backgroundColor: colors.primary }]}>
-            <Feather name="zap" size={36} color="#fff" />
+          <View style={[styles.logoCircle, { backgroundColor: colors.neonRed }]}>
+            <Feather name="zap" size={28} color="#fff" />
           </View>
           <Text style={[styles.appName, { color: colors.foreground }]}>ChefCast</Text>
-          <Text style={[styles.appTagline, { color: colors.accent }]}>LIVE</Text>
+          <Text style={[styles.appTagline, { color: colors.neonRed }]}>LIVE</Text>
         </View>
 
         <Text style={[styles.headline, { color: colors.foreground }]}>
-          {step === 0 ? "What's your cooking level?" : "What cuisines excite you?"}
+          {step === 0 ? "What's your cooking level?" : step === 1 ? "What cuisines excite you?" : "Select your gender"}
         </Text>
 
         <Text style={[styles.subtext, { color: colors.mutedForeground }]}>
           {step === 0
             ? "We'll tailor the experience to match your skills"
-            : "We'll suggest episodes you'll love"}
+            : step === 1
+            ? "We'll suggest episodes you'll love"
+            : "Help us personalize your experience"}
         </Text>
 
         {/* Step 0: Cooking Level */}
@@ -171,12 +208,62 @@ export default function WelcomeScreen() {
           </View>
         )}
 
+        {/* Step 2: Gender */}
+        {step === 2 && (
+          <View style={styles.genderGrid}>
+            {GENDERS.map((g) => (
+              <TouchableOpacity
+                key={g.value}
+                onPress={() => setSelectedGender(g.value)}
+                activeOpacity={0.8}
+                style={[
+                  styles.genderCard,
+                  {
+                    backgroundColor: selectedGender === g.value ? `${colors.primary}22` : colors.surface,
+                    borderColor: selectedGender === g.value ? colors.primary : colors.border,
+                    borderWidth: selectedGender === g.value ? 2 : 1,
+                  },
+                ]}
+              >
+                <View style={[styles.genderIcon, { backgroundColor: `${colors.primary}22` }]}>
+                  <Feather name={g.icon} size={24} color={colors.primary} />
+                </View>
+                <Text style={[styles.genderLabel, { color: colors.foreground }]}>
+                  {g.label}
+                </Text>
+                {selectedGender === g.value && (
+                  <Feather name="check-circle" size={18} color={colors.primary} style={styles.genderCheck} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <Button
-          title={step === 0 ? "Continue" : "Start Cooking"}
-          disabled={step === 0 ? !selectedLevel : false}
+          title={step === 0 ? "Continue" : step === 1 ? "Continue" : "Create Account"}
+          disabled={step === 0 ? !selectedLevel : step === 1 ? selectedCuisines.length === 0 : !selectedGender}
           onPress={handleNext}
           style={styles.cta}
         />
+
+        {/* Anonymous signin button */}
+        <TouchableOpacity
+          onPress={handleAnonymousSignin}
+          disabled={step === 0 ? !selectedLevel : step === 1 ? selectedCuisines.length === 0 : !selectedGender}
+          style={[
+            styles.anonButton,
+            {
+              backgroundColor: `${colors.neonRed}15`,
+              borderColor: colors.neonRed,
+              opacity: (step === 0 && !selectedLevel) || (step === 1 && selectedCuisines.length === 0) || (step === 2 && !selectedGender) ? 0.4 : 1,
+            },
+          ]}
+        >
+          <Feather name="user-x" size={16} color={colors.neonRed} />
+          <Text style={[styles.anonButtonText, { color: colors.neonRed }]}>
+            Continue as Guest
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => router.push("/(auth)/login")}
@@ -201,55 +288,61 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
-    gap: 24,
+    gap: 20,
   },
   logoArea: {
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+    marginBottom: 8,
   },
   logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#FF1744",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
   },
   appName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
     letterSpacing: -0.5,
   },
   appTagline: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 4,
-    marginTop: -8,
+    letterSpacing: 3,
+    marginTop: -4,
   },
   headline: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: "700",
-    lineHeight: 32,
+    lineHeight: 28,
     textAlign: "center",
   },
   subtext: {
-    fontSize: 15,
+    fontSize: 14,
     textAlign: "center",
-    marginTop: -12,
+    marginTop: -8,
   },
   options: {
-    gap: 12,
+    gap: 10,
   },
   levelCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    padding: 16,
-    borderRadius: 16,
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
   },
   levelIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -258,35 +351,86 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   levelLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
   levelDesc: {
-    fontSize: 13,
+    fontSize: 12,
   },
   cuisineGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
     justifyContent: "center",
   },
   cuisineChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 24,
     borderWidth: 1,
   },
   cuisineLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
   },
+  genderGrid: {
+    gap: 10,
+  },
+  genderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    position: "relative",
+  },
+  genderIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  genderLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  genderCheck: {
+    position: "absolute",
+    right: 14,
+  },
   cta: {
-    marginTop: 8,
+    marginTop: 4,
+    shadowColor: "#E8572A",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  anonButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    shadowColor: "#FF1744",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  anonButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
   },
   loginLink: {
     alignItems: "center",
+    paddingBottom: 8,
   },
   loginText: {
-    fontSize: 14,
+    fontSize: 13,
   },
 });

@@ -196,16 +196,16 @@ export default function HomeScreen() {
         {/* Live Episode Banner */}
         {liveEpisode && (
           <View style={styles.section}>
-            <View style={[styles.liveBanner, { backgroundColor: `${colors.live}15`, borderColor: `${colors.live}40` }]}>
+            <View style={[styles.liveBanner, { backgroundColor: `${colors.neonRed}08`, borderColor: `${colors.neonRed}40` }]}>
               <View style={styles.liveBannerHeader}>
                 <LiveBadge />
-                <Text style={[styles.liveBannerTitle, { color: colors.live }]}>
+                <Text style={[styles.liveBannerTitle, { color: colors.neonRed }]}>
                   On Air Now
                 </Text>
               </View>
               <EpisodeCard episode={liveEpisode} />
               <TouchableOpacity
-                style={[styles.joinButton, { backgroundColor: colors.live }]}
+                style={[styles.joinButton, { backgroundColor: colors.neonRed }]}
                 onPress={() => router.push("/(tabs)/cook-along" as never)}
               >
                 <Feather name="zap" size={16} color="#fff" />
@@ -227,7 +227,7 @@ export default function HomeScreen() {
               </View>
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
               <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: colors.foreground }]}>{currentStreak}</Text>
+                <Text style={[styles.statValue, { color: colors.neonRed }]}>{currentStreak}</Text>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Streak</Text>
               </View>
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
@@ -298,15 +298,15 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <TouchableOpacity
             onPress={() => router.push("/mystery-box" as never)}
-            style={[styles.mysteryBanner, { backgroundColor: colors.surface, borderColor: colors.accent }]}
+            style={[styles.mysteryBanner, { backgroundColor: colors.surface, borderColor: colors.neonRed }]}
           >
             <LinearGradient
-              colors={[`${colors.accent}22`, "transparent"]}
+              colors={[`${colors.neonRed}15`, "transparent"]}
               style={StyleSheet.absoluteFill}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             />
-            <Feather name="box" size={28} color={colors.accent} />
+            <Feather name="box" size={28} color={colors.neonRed} />
             <View style={styles.mysteryText}>
               <Text style={[styles.mysteryTitle, { color: colors.foreground }]}>
                 Mystery Box Challenge

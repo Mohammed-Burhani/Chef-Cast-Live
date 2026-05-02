@@ -107,7 +107,13 @@ export default function PantryScreen() {
         contentContainerStyle={[styles.content, { paddingTop: topPadding + 16, paddingBottom: bottomPadding + 80 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.screenTitle, { color: colors.foreground }]}>Pantry</Text>
+        {/* Header with neon red accent */}
+        <View style={styles.headerRow}>
+          <Text style={[styles.screenTitle, { color: colors.foreground }]}>Pantry</Text>
+          <View style={[styles.neonAccent, { backgroundColor: `${colors.neonRed}20`, borderColor: colors.neonRed }]}>
+            <Feather name="zap" size={14} color={colors.neonRed} />
+          </View>
+        </View>
 
         {/* Section selector */}
         <View style={[styles.sectionSelector, { backgroundColor: colors.surface }]}>
@@ -192,8 +198,8 @@ export default function PantryScreen() {
               </View>
             </View>
 
-            <View style={[styles.streakTip, { backgroundColor: `${colors.warning}15`, borderColor: colors.warning }]}>
-              <Feather name="alert-circle" size={16} color={colors.warning} />
+            <View style={[styles.streakTip, { backgroundColor: `${colors.neonRed}10`, borderColor: colors.neonRed }]}>
+              <Feather name="alert-circle" size={16} color={colors.neonRed} />
               <Text style={[styles.streakTipText, { color: colors.foreground }]}>
                 Cook tonight to keep your {currentStreak}-day streak alive!
               </Text>
@@ -233,42 +239,44 @@ export default function PantryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 20, gap: 20 },
-  screenTitle: { fontSize: 26, fontWeight: "800" },
-  sectionSelector: { flexDirection: "row", borderRadius: 14, padding: 4, gap: 4 },
-  sectionTab: { flex: 1, alignItems: "center", paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, gap: 2 },
-  sectionTabLabel: { fontSize: 13, fontWeight: "700" },
-  sectionTabCount: { fontSize: 11, fontWeight: "500" },
+  content: { paddingHorizontal: 20, gap: 16 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  screenTitle: { fontSize: 24, fontWeight: "800" },
+  neonAccent: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
+  sectionSelector: { flexDirection: "row", borderRadius: 12, padding: 3, gap: 3 },
+  sectionTab: { flex: 1, alignItems: "center", paddingVertical: 8, paddingHorizontal: 4, borderRadius: 9, gap: 2 },
+  sectionTabLabel: { fontSize: 12, fontWeight: "700" },
+  sectionTabCount: { fontSize: 10, fontWeight: "500" },
   badgesSection: {},
   badgesGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  xpSection: { gap: 16 },
-  xpCard: { borderRadius: 20, padding: 24, alignItems: "center", gap: 16 },
-  levelInfo: { alignItems: "center", gap: 4 },
-  levelName: { fontSize: 20, fontWeight: "700" },
-  nextLevelText: { fontSize: 13 },
-  sectionLabel: { fontSize: 16, fontWeight: "700" },
-  xpLogList: { gap: 8 },
-  xpLogRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 12 },
-  xpLogDot: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  xpLogLabel: { flex: 1, fontSize: 13 },
-  xpLogAmount: { fontSize: 14, fontWeight: "700" },
-  streakSection: { gap: 14 },
-  streakCard: { borderRadius: 20, padding: 24, alignItems: "center", gap: 20 },
-  streakStats: { flexDirection: "row", alignItems: "center", gap: 16 },
-  streakStat: { alignItems: "center", gap: 4, flex: 1 },
-  streakStatValue: { fontSize: 36, fontWeight: "800", letterSpacing: -1 },
-  streakStatLabel: { fontSize: 12 },
-  streakDivider: { width: 1, height: 50 },
-  streakTip: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
-  streakTipText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  freezeCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 16, borderWidth: 1 },
+  xpSection: { gap: 14 },
+  xpCard: { borderRadius: 18, padding: 20, alignItems: "center", gap: 14 },
+  levelInfo: { alignItems: "center", gap: 3 },
+  levelName: { fontSize: 18, fontWeight: "700" },
+  nextLevelText: { fontSize: 12 },
+  sectionLabel: { fontSize: 15, fontWeight: "700" },
+  xpLogList: { gap: 7 },
+  xpLogRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 10 },
+  xpLogDot: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  xpLogLabel: { flex: 1, fontSize: 12 },
+  xpLogAmount: { fontSize: 13, fontWeight: "700" },
+  streakSection: { gap: 12 },
+  streakCard: { borderRadius: 18, padding: 20, alignItems: "center", gap: 16 },
+  streakStats: { flexDirection: "row", alignItems: "center", gap: 14 },
+  streakStat: { alignItems: "center", gap: 3, flex: 1 },
+  streakStatValue: { fontSize: 32, fontWeight: "800", letterSpacing: -1 },
+  streakStatLabel: { fontSize: 11 },
+  streakDivider: { width: 1, height: 45 },
+  streakTip: { flexDirection: "row", alignItems: "center", gap: 9, padding: 12, borderRadius: 12, borderWidth: 1 },
+  streakTipText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  freezeCard: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
   freezeInfo: { flex: 1, gap: 2 },
-  freezeTitle: { fontSize: 14, fontWeight: "600" },
-  freezeDesc: { fontSize: 12, lineHeight: 17 },
-  premiumBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  premiumBadgeText: { color: "#0D0D0D", fontSize: 10, fontWeight: "800" },
-  scanButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
-  scanButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  freezeTitle: { fontSize: 13, fontWeight: "600" },
+  freezeDesc: { fontSize: 11, lineHeight: 16 },
+  premiumBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  premiumBadgeText: { color: "#0D0D0D", fontSize: 9, fontWeight: "800" },
+  scanButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 13, borderRadius: 12 },
+  scanButtonText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "flex-end" },
   modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, alignItems: "center", gap: 14 },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.2)", marginBottom: 8 },

@@ -56,7 +56,7 @@ function TimerRing({ remaining, total }: { remaining: number; total: number }) {
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.surface} strokeWidth={stroke} fill="none" />
         <Circle
           cx={size / 2} cy={size / 2} r={r}
-          stroke={isUrgent ? colors.live : colors.primary}
+          stroke={isUrgent ? colors.neonRed : colors.primary}
           strokeWidth={stroke} fill="none"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - progress)}
@@ -65,7 +65,7 @@ function TimerRing({ remaining, total }: { remaining: number; total: number }) {
           origin={`${size / 2},${size / 2}`}
         />
       </Svg>
-      <Text style={[styles.timerNumber, { color: isUrgent ? colors.live : colors.foreground }]}>
+      <Text style={[styles.timerNumber, { color: isUrgent ? colors.neonRed : colors.foreground }]}>
         {remaining}
       </Text>
     </View>
@@ -193,10 +193,11 @@ function IdleScreen() {
   const timeToStart = new Date(event.scheduledAt).getTime() - Date.now();
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.idleContent, { paddingTop: topPad + 16, paddingBottom: bottomPad + 80 }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        contentContainerStyle={[styles.idleContent, { paddingTop: topPad + 16, paddingBottom: bottomPad + 80 }]}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Live event card */}
       <View style={[styles.eventCard, { backgroundColor: colors.surface }]}>
         <Image source={{ uri: event.thumbnailUrl }} style={styles.eventThumb} contentFit="cover" />
@@ -227,14 +228,14 @@ function IdleScreen() {
           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           startQuiz();
         }}
-        style={[styles.joinBtn, { backgroundColor: colors.primary }]}
+        style={[styles.joinBtn, { backgroundColor: colors.neonRed }]}
       >
         <Feather name="zap" size={20} color="#fff" />
         <Text style={styles.joinBtnText}>Join Live Quiz</Text>
       </TouchableOpacity>
 
       <View style={[styles.hintCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Feather name="info" size={15} color={colors.primary} />
+        <Feather name="info" size={15} color={colors.neonRed} />
         <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
           Answer faster for more points. A correct answer in 2 seconds beats the same answer in 10.
         </Text>
@@ -281,6 +282,7 @@ function IdleScreen() {
         </View>
       )}
     </ScrollView>
+    </View>
   );
 }
 
