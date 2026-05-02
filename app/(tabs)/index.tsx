@@ -122,7 +122,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
-  const { xpTotal, currentStreak, badges } = useGamificationStore();
+  const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
   const [refreshing, setRefreshing] = useState(false);
 

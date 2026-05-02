@@ -7,6 +7,7 @@ export interface UserProfile {
   username: string;
   displayName: string;
   avatarUrl?: string;
+  gender?: "male" | "female" | "other";
   xpTotal: number;
   currentStreak: number;
   longestStreak: number;

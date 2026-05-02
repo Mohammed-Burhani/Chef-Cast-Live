@@ -32,13 +32,14 @@ export default function SignupScreen() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other" | "">("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const handleSignup = async () => {
-    if (!displayName.trim() || !username.trim() || !email.trim()) {
+    if (!displayName.trim() || !username.trim() || !email.trim() || !gender) {
       setError("Please fill in all fields");
       return;
     }
@@ -50,6 +51,7 @@ export default function SignupScreen() {
       id: `user-${Date.now()}`,
       username: username.toLowerCase().replace(/\s/g, "_"),
       displayName: displayName.trim(),
+      gender,
       xpTotal: 0,
       currentStreak: 0,
       longestStreak: 0,
@@ -115,6 +117,44 @@ export default function SignupScreen() {
               </View>
             ))}
 
+            {/* Gender selector */}
+            <View style={styles.genderSection}>
+              <Text style={[styles.genderLabel, { color: colors.foreground }]}>Gender</Text>
+              <View style={styles.genderButtons}>
+                {[
+                  { value: "male" as const, label: "Male", icon: "user" as const },
+                  { value: "female" as const, label: "Female", icon: "user" as const },
+                  { value: "other" as const, label: "Other", icon: "users" as const },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setGender(option.value)}
+                    style={[
+                      styles.genderButton,
+                      {
+                        backgroundColor: gender === option.value ? `${colors.primary}22` : colors.surface,
+                        borderColor: gender === option.value ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <Feather
+                      name={option.icon}
+                      size={16}
+                      color={gender === option.value ? colors.primary : colors.mutedForeground}
+                    />
+                    <Text
+                      style={[
+                        styles.genderButtonText,
+                        { color: gender === option.value ? colors.primary : colors.foreground },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {error ? (
               <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
             ) : null}
@@ -164,6 +204,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   input: { flex: 1, fontSize: 16 },
+  genderSection: { gap: 10 },
+  genderLabel: { fontSize: 14, fontWeight: "600" },
+  genderButtons: { flexDirection: "row", gap: 10 },
+  genderButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  genderButtonText: { fontSize: 14, fontWeight: "600" },
   error: { fontSize: 13, marginTop: -4 },
   footer: {
     flexDirection: "row",

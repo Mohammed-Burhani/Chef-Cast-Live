@@ -722,13 +722,12 @@ function CompleteScreen() {
       <Text style={[styles.reviewTitle, { color: colors.foreground }]}>Final Leaderboard</Text>
       <MiniLeaderboard entries={liveLeaderboard} />
 
-      <TouchableOpacity
-        onPress={resetQuiz}
-        style={[styles.playAgainBtn, { backgroundColor: colors.primary }]}
-      >
-        <Feather name="rotate-cw" size={17} color="#fff" />
-        <Text style={styles.playAgainText}>Play Again</Text>
-      </TouchableOpacity>
+      <View style={[styles.quizEndHint, { backgroundColor: `${colors.mutedForeground}15` }]}>
+        <Feather name="tv" size={16} color={colors.mutedForeground} />
+        <Text style={[styles.quizEndText, { color: colors.mutedForeground }]}>
+          Quiz complete! Watch for the next live episode.
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -870,6 +869,6 @@ const styles = StyleSheet.create({
   reviewYourAnswer: { fontSize: 13 },
   reviewCorrect: { fontSize: 13, fontWeight: "600" },
   reviewPoints: { fontSize: 13, fontWeight: "700", textAlign: "right" },
-  playAgainBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 14 },
-  playAgainText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  quizEndHint: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 16, borderRadius: 14, marginTop: 8 },
+  quizEndText: { fontSize: 14, fontWeight: "500", textAlign: "center" },
 });

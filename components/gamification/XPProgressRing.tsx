@@ -15,11 +15,12 @@ interface XPProgressRingProps {
   size?: number;
 }
 
-export function XPProgressRing({ xp, size = 140 }: XPProgressRingProps) {
+export function XPProgressRing({ xp = 0, size = 140 }: XPProgressRingProps) {
   const colors = useColors();
-  const currentLevel = getLevelForXP(xp);
-  const nextLevel = getNextLevel(xp);
-  const progress = getLevelProgress(xp);
+  const safeXP = xp || 0;
+  const currentLevel = getLevelForXP(safeXP);
+  const nextLevel = getNextLevel(safeXP);
+  const progress = getLevelProgress(safeXP);
 
   const animatedProgress = useRef(new Animated.Value(0)).current;
 
@@ -66,7 +67,7 @@ export function XPProgressRing({ xp, size = 140 }: XPProgressRingProps) {
       {/* Center content */}
       <View style={styles.center}>
         <Text style={[styles.xpNumber, { color: colors.foreground }]}>
-          {xp.toLocaleString()}
+          {safeXP.toLocaleString()}
         </Text>
         <Text style={[styles.xpLabel, { color: colors.mutedForeground }]}>XP</Text>
         <View style={[styles.levelBadge, { backgroundColor: colors.primary }]}>
@@ -76,7 +77,7 @@ export function XPProgressRing({ xp, size = 140 }: XPProgressRingProps) {
 
       {nextLevel && (
         <Text style={[styles.nextLevel, { color: colors.mutedForeground }]}>
-          {nextLevel.minXP - xp} XP to {nextLevel.name}
+          {(nextLevel.minXP - safeXP).toLocaleString()} XP to {nextLevel.name}
         </Text>
       )}
     </View>
