@@ -16,16 +16,19 @@ import { useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { useColors } from '@/hooks/useColors';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
 import { useQuizStore, useQuizPhase } from '@/store/quizStore';
 import { useCommentStore } from '@/store/commentStore';
-import { useRealtimeStore } from '@/store/realtimeStore';
+// import { useRealtimeStore } from '@/store/realtimeStore'; // COMMENTED OUT FOR PROTOTYPE
+import { MOCK_EPISODES } from '@/constants/mockData';
+/* REALTIME HOOKS COMMENTED OUT FOR PROTOTYPE
 import {
   useEpisodeChannel,
   useQuestionEvents,
   useLeaderboardEvents,
   useEpisodeStateEvents,
 } from '@/lib/realtime';
+*/
 
 import { VideoPlayer } from '@/components/live/VideoPlayer';
 import { TabBar } from '@/components/live/TabBar';
@@ -49,14 +52,15 @@ export default function LiveEpisodeScreen() {
 
   const phase = useQuizPhase();
   const isQuizActive = phase === 'question' || phase === 'answered';
-  const isConnectionFailed = useRealtimeStore((s) => s.isAnyChannelFailed());
+  // const isConnectionFailed = useRealtimeStore((s) => s.isAnyChannelFailed()); // COMMENTED OUT
+  const isConnectionFailed = false; // PROTOTYPE: no realtime
 
   const {
     joinEpisode,
-    handleQuestionActivated,
-    handleQuestionClosed,
-    handleLeaderboardUpdate,
-    handleEpisodeEnded,
+    // handleQuestionActivated,
+    // handleQuestionClosed,
+    // handleLeaderboardUpdate,
+    // handleEpisodeEnded,
     reset: resetQuiz,
   } = useQuizStore();
 
@@ -66,6 +70,18 @@ export default function LiveEpisodeScreen() {
   useEffect(() => {
     const fetchEpisode = async () => {
       try {
+        // PROTOTYPE: Using mock data
+        const mockEp = MOCK_EPISODES.find(ep => ep.id === id);
+        if (mockEp) {
+          setEpisode({
+            id: mockEp.id,
+            title: mockEp.title,
+            youtube_stream_url: null,
+          });
+        }
+        setIsLoading(false);
+
+        /* SUPABASE CODE COMMENTED OUT
         const { data, error } = await supabase
           .from('episodes')
           .select('id, title, youtube_stream_url')
@@ -76,6 +92,7 @@ export default function LiveEpisodeScreen() {
 
         setEpisode(data);
         setIsLoading(false);
+        */
       } catch (error) {
         console.error('[Episode] Fetch error:', error);
         setIsLoading(false);
@@ -97,7 +114,8 @@ export default function LiveEpisodeScreen() {
     };
   }, [episode]);
 
-  // Realtime subscriptions
+  // PROTOTYPE: Realtime subscriptions commented out
+  /* SUPABASE REALTIME COMMENTED OUT
   useEpisodeChannel(episode?.id ?? '');
 
   useQuestionEvents(episode?.id ?? '', {
@@ -110,6 +128,7 @@ export default function LiveEpisodeScreen() {
   useEpisodeStateEvents(episode?.id ?? '', {
     onEnded: useCallback(handleEpisodeEnded, []),
   });
+  */
 
   if (isLoading) {
     return (

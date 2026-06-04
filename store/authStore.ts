@@ -1,15 +1,44 @@
 /**
- * Supabase Authentication Store
- * Manages session, user, and profile state with auto-sync
+ * ============================================================================
+ * MOCK AUTHENTICATION FOR PROTOTYPE
+ * ============================================================================
+ * Supabase authentication is commented out. Using mock session instead.
  */
 
 import { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
 
 type Profile = Tables<'profiles'>;
+
+// Mock user and profile for prototype
+const MOCK_USER: User = {
+  id: 'user-proto-001',
+  email: 'chef@prototype.com',
+  created_at: new Date().toISOString(),
+  app_metadata: {},
+  user_metadata: {},
+  aud: 'authenticated',
+} as User;
+
+const MOCK_PROFILE: Profile = {
+  id: 'user-proto-001',
+  username: 'prototype_chef',
+  avatar_url: null,
+  is_admin: false,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+} as Profile;
+
+const MOCK_SESSION: Session = {
+  access_token: 'mock-token',
+  refresh_token: 'mock-refresh',
+  expires_in: 3600,
+  token_type: 'bearer',
+  user: MOCK_USER,
+} as Session;
 
 interface AuthState {
   session: Session | null;
@@ -39,12 +68,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut();
+    // await supabase.auth.signOut();
     set({ session: null, user: null, profile: null });
   },
 
   initialize: async () => {
     try {
+      // PROTOTYPE: Auto-login with mock user
+      set({ 
+        session: MOCK_SESSION, 
+        user: MOCK_USER,
+        profile: MOCK_PROFILE,
+        isLoading: false 
+      });
+
+      /* SUPABASE CODE COMMENTED OUT
       // Restore session from AsyncStorage
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -67,6 +105,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       });
 
       set({ isLoading: false });
+      */
     } catch (error) {
       console.error('[Auth] Initialize error:', error);
       set({ isLoading: false });
@@ -75,6 +114,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   // Internal: sync profile from DB or create if missing
   syncProfile: async (user: User) => {
+    // PROTOTYPE: Use mock profile
+    set({ profile: MOCK_PROFILE });
+
+    /* SUPABASE CODE COMMENTED OUT
     try {
       // Check if profile exists
       const { data: existing, error: fetchError } = await supabase
@@ -115,5 +158,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     } catch (error) {
       console.error('[Auth] Profile sync error:', error);
     }
+    */
   },
 }));

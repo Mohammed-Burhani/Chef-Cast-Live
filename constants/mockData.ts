@@ -1,6 +1,9 @@
 /**
- * Mock data for development.
- * In production, quiz questions and leaderboards are pushed via Supabase Realtime.
+ * ============================================================================
+ * MOCK DATA FOR PROTOTYPE - Replaces Supabase Integration
+ * ============================================================================
+ * Complete dataset with live events, highlights, communities, scores, etc.
+ * Everything looking real for prototype demonstration.
  */
 
 import {
@@ -60,6 +63,36 @@ export const MOCK_EPISODES: Episode[] = [
     episodeNumber: 10,
     difficulty: "easy",
     duration: 40,
+    hasQuiz: true,
+  },
+  {
+    id: "ep-004",
+    title: "Thai Green Curry",
+    description:
+      "Aromatic, spicy, and creamy — Chef Yuki walks through authentic Thai green curry from scratch including homemade paste.",
+    thumbnailUrl: "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=800",
+    broadcastAt: new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString(),
+    isLive: false,
+    chefName: "Chef Yuki Tanaka",
+    season: 3,
+    episodeNumber: 11,
+    difficulty: "medium",
+    duration: 50,
+    hasQuiz: true,
+  },
+  {
+    id: "ep-005",
+    title: "Spanish Paella Masterclass",
+    description:
+      "The ultimate one-pan wonder! Chef Carlos teaches the secrets to perfect socarrat and saffron-infused seafood paella.",
+    thumbnailUrl: "https://images.unsplash.com/photo-1534080564583-6be75777b70a?w=800",
+    broadcastAt: new Date(Date.now() + 1000 * 60 * 60 * 120).toISOString(),
+    isLive: false,
+    chefName: "Chef Carlos Mendoza",
+    season: 3,
+    episodeNumber: 12,
+    difficulty: "hard",
+    duration: 60,
     hasQuiz: true,
   },
 ];
@@ -345,3 +378,98 @@ export const MOCK_RECIPE: Recipe = {
     fat: 14,
   },
 };
+
+
+// ─── Additional Mock Data for Prototype ───────────────────────────────────────
+
+// Live streaming stats
+export const MOCK_LIVE_STATS = {
+  currentViewers: 2847,
+  peakViewers: 3215,
+  totalLikes: 18432,
+  totalComments: 6891,
+};
+
+// User gamification stats
+export const MOCK_USER_STATS = {
+  xpTotal: 4800,
+  currentStreak: 7,
+  longestStreak: 21,
+  badgesUnlocked: 12,
+  totalBadges: 24,
+  rank: 847,
+  totalUsers: 15243,
+};
+
+// Highlights/Featured moments
+export const MOCK_HIGHLIGHTS = [
+  {
+    id: "highlight-1",
+    episodeId: "ep-001",
+    title: "Perfect Risotto Technique",
+    thumbnailUrl: "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400",
+    timestamp: "12:35",
+    views: 8234,
+  },
+  {
+    id: "highlight-2",
+    episodeId: "ep-002",
+    title: "Duck Skin Rendering Masterclass",
+    thumbnailUrl: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400",
+    timestamp: "18:42",
+    views: 12456,
+  },
+  {
+    id: "highlight-3",
+    episodeId: "ep-003",
+    title: "Caramelizing Onions Like a Pro",
+    thumbnailUrl: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400",
+    timestamp: "8:15",
+    views: 6742,
+  },
+];
+
+// Live comments (for community feed)
+export const MOCK_LIVE_COMMENTS = [
+  { id: "c1", username: "chef_at_home", text: "This looks amazing! 🔥", timestamp: Date.now() - 30000 },
+  { id: "c2", username: "foodie_sara", text: "Can't wait to try this recipe!", timestamp: Date.now() - 45000 },
+  { id: "c3", username: "pasta_queen", text: "That mantecatura technique is 👨‍🍳💋", timestamp: Date.now() - 60000 },
+  { id: "c4", username: "weekend_warrior", text: "Watching from Tokyo! Love this show", timestamp: Date.now() - 90000 },
+  { id: "c5", username: "midnight_cook", text: "Question: Can I use vegetable stock instead?", timestamp: Date.now() - 120000 },
+];
+
+// Upcoming schedule
+export const MOCK_SCHEDULE = [
+  {
+    id: "sched-1",
+    episodeId: "ep-002",
+    title: "Pan-Seared Duck Breast",
+    chefName: "Chef Sophie Laurent",
+    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 3).toISOString(),
+    thumbnailUrl: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400",
+  },
+  {
+    id: "sched-2",
+    episodeId: "ep-003",
+    title: "Classic French Onion Soup",
+    chefName: "Chef Jean-Pierre",
+    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 48).toISOString(),
+    thumbnailUrl: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400",
+  },
+];
+
+// Top chefs leaderboard
+export const MOCK_TOP_CHEFS = [
+  { id: "chef1", name: "Chef Marco Rossi", specialty: "Italian", episodes: 42, rating: 4.9 },
+  { id: "chef2", name: "Chef Sophie Laurent", specialty: "French", episodes: 38, rating: 4.8 },
+  { id: "chef3", name: "Chef Yuki Tanaka", specialty: "Japanese", episodes: 35, rating: 4.9 },
+  { id: "chef4", name: "Chef Carlos Mendoza", specialty: "Spanish", episodes: 28, rating: 4.7 },
+];
+
+// Trending recipes
+export const MOCK_TRENDING_RECIPES = [
+  { id: "recipe1", title: "Saffron Risotto", saves: 8234, difficulty: "medium" },
+  { id: "recipe2", title: "Duck Breast with Cherry Reduction", saves: 6542, difficulty: "hard" },
+  { id: "recipe3", title: "French Onion Soup", saves: 12456, difficulty: "easy" },
+  { id: "recipe4", title: "Thai Green Curry", saves: 9876, difficulty: "medium" },
+];

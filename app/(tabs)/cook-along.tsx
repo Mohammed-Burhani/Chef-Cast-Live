@@ -30,14 +30,16 @@ import {
   useIsCorrect,
   useTotalScore,
 } from "@/store/quizStore";
-import { useRealtimeStore } from "@/store/realtimeStore";
+// import { useRealtimeStore } from "@/store/realtimeStore"; // COMMENTED OUT FOR PROTOTYPE
 import { useEpisodeStore } from "@/store/episodeStore";
+/* REALTIME HOOKS COMMENTED OUT FOR PROTOTYPE
 import {
   useEpisodeChannel,
   useQuestionEvents,
   useLeaderboardEvents,
   useEpisodeStateEvents,
 } from "@/lib/realtime";
+*/
 
 // Timer Ring Component
 function TimerRing({ remaining, total }: { remaining: number; total: number }) {
@@ -486,12 +488,14 @@ function EpisodeEndedScreen() {
 // Root Component
 export default function CookAlongScreen() {
   const phase = useQuizPhase();
-  const { joinEpisode, handleQuestionActivated, handleQuestionClosed, handleLeaderboardUpdate, handleEpisodeEnded, reset } = useQuizStore();
-  const isConnectionFailed = useRealtimeStore((s) => s.isAnyChannelFailed());
+  const { joinEpisode, /* handleQuestionActivated, handleQuestionClosed, handleLeaderboardUpdate, handleEpisodeEnded, */ reset } = useQuizStore();
+  // const isConnectionFailed = useRealtimeStore((s) => s.isAnyChannelFailed()); // COMMENTED OUT
+  const isConnectionFailed = false; // PROTOTYPE: no realtime
   const currentLiveEpisodeId = useEpisodeStore((s) => s.currentLiveEpisodeId);
   const colors = useColors();
 
-  // Connect Realtime (only if episode ID exists)
+  // PROTOTYPE: Realtime connections commented out
+  /* SUPABASE REALTIME COMMENTED OUT
   useEpisodeChannel(currentLiveEpisodeId ?? '');
 
   useQuestionEvents(currentLiveEpisodeId ?? '', {
@@ -504,6 +508,7 @@ export default function CookAlongScreen() {
   useEpisodeStateEvents(currentLiveEpisodeId ?? '', {
     onEnded: useCallback(handleEpisodeEnded, []),
   });
+  */
 
   // Join episode on mount
   useEffect(() => {

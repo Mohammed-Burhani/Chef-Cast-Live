@@ -1,11 +1,14 @@
 /**
- * Comment Store
- * Manages live episode comments with Realtime sync
+ * ============================================================================
+ * MOCK COMMENT STORE FOR PROTOTYPE
+ * ============================================================================
+ * Supabase realtime commented out. Using mock comments.
  */
 
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
 import { useAuthStore } from './authStore';
+import { MOCK_LIVE_COMMENTS } from '@/constants/mockData';
 
 export interface Comment {
   id: string;
@@ -42,6 +45,20 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
     set({ isLoading: true });
 
     try {
+      // PROTOTYPE: Mock comments
+      const mockComments: Comment[] = MOCK_LIVE_COMMENTS.map((c, idx) => ({
+        id: c.id,
+        episodeId,
+        userId: `user-${idx}`,
+        username: c.username,
+        avatarUrl: null,
+        text: c.text,
+        createdAt: new Date(c.timestamp).toISOString(),
+      }));
+
+      set({ comments: mockComments, isLoading: false });
+
+      /* SUPABASE CODE COMMENTED OUT
       const { data, error } = await supabase
         .from('comments')
         .select(`
@@ -72,6 +89,7 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
       }));
 
       set({ comments, isLoading: false });
+      */
     } catch (error) {
       console.error('[Comments] Load error:', error);
       set({ isLoading: false });
@@ -111,6 +129,22 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
     set({ isSending: true, sendError: null });
 
     try {
+      // PROTOTYPE: Mock successful send, add to local state
+      const newComment: Comment = {
+        id: `comment-${Date.now()}`,
+        episodeId,
+        userId,
+        username: useAuthStore.getState().profile?.username || 'You',
+        avatarUrl: null,
+        text: trimmed,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Add to local state
+      get().appendComment(newComment);
+      set({ isSending: false });
+
+      /* SUPABASE CODE COMMENTED OUT
       const { error } = await supabase
         .from('comments')
         .insert({
@@ -122,6 +156,7 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
       if (error) throw error;
 
       set({ isSending: false });
+      */
     } catch (error: any) {
       console.error('[Comments] Send error:', error);
       set({

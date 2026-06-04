@@ -22,7 +22,8 @@ import { Feather } from '@expo/vector-icons';
 
 import { useColors } from '@/hooks/useColors';
 import { useAuthStore } from '@/store/authStore';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
+import { MOCK_EPISODES } from '@/constants/mockData';
 
 interface Episode {
   id: string;
@@ -61,6 +62,17 @@ export default function AdminScreen() {
 
   const fetchEpisodes = async () => {
     try {
+      // PROTOTYPE: Using mock data
+      const mockEpisodes = MOCK_EPISODES.map(ep => ({
+        id: ep.id,
+        title: ep.title,
+        is_live: ep.isLive,
+        scheduled_at: ep.broadcastAt,
+        youtube_stream_url: null,
+      }));
+      setEpisodes(mockEpisodes);
+
+      /* SUPABASE CODE COMMENTED OUT
       const { data, error } = await supabase
         .from('episodes')
         .select('id, title, is_live, scheduled_at, youtube_stream_url')
@@ -69,6 +81,7 @@ export default function AdminScreen() {
 
       if (error) throw error;
       setEpisodes(data || []);
+      */
     } catch (error) {
       console.error('[Admin] Fetch episodes error:', error);
     } finally {
@@ -78,6 +91,14 @@ export default function AdminScreen() {
 
   const fetchQuestions = async (episodeId: string) => {
     try {
+      // PROTOTYPE: Mock questions data
+      setQuestions([
+        { id: 'q1', question_text: 'What type of rice is used for risotto?', is_active: false, sequence_number: 1 },
+        { id: 'q2', question_text: 'What is mantecatura?', is_active: true, sequence_number: 2 },
+        { id: 'q3', question_text: 'Why add stock gradually?', is_active: false, sequence_number: 3 },
+      ]);
+
+      /* SUPABASE CODE COMMENTED OUT
       const { data, error } = await supabase
         .from('questions')
         .select('id, question_text, is_active, sequence_number')
@@ -86,6 +107,7 @@ export default function AdminScreen() {
 
       if (error) throw error;
       setQuestions(data || []);
+      */
     } catch (error) {
       console.error('[Admin] Fetch questions error:', error);
     }
@@ -93,6 +115,11 @@ export default function AdminScreen() {
 
   const toggleLive = async (episodeId: string, currentState: boolean) => {
     try {
+      // PROTOTYPE: Mock toggle
+      Alert.alert('Success', `Episode ${!currentState ? 'is now LIVE!' : 'ended'}`);
+      fetchEpisodes();
+
+      /* SUPABASE CODE COMMENTED OUT
       const { error } = await supabase
         .from('episodes')
         .update({ is_live: !currentState })
@@ -102,6 +129,7 @@ export default function AdminScreen() {
 
       Alert.alert('Success', `Episode ${!currentState ? 'is now LIVE!' : 'ended'}`);
       fetchEpisodes();
+      */
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -109,6 +137,11 @@ export default function AdminScreen() {
 
   const activateQuestion = async (questionId: string, episodeId: string) => {
     try {
+      // PROTOTYPE: Mock activation
+      Alert.alert('Success', 'Question activated!');
+      fetchQuestions(episodeId);
+
+      /* SUPABASE CODE COMMENTED OUT
       // Close all active questions first
       await supabase
         .from('questions')
@@ -130,6 +163,7 @@ export default function AdminScreen() {
 
       Alert.alert('Success', 'Question activated!');
       fetchQuestions(episodeId);
+      */
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }
@@ -137,6 +171,11 @@ export default function AdminScreen() {
 
   const closeQuestion = async (questionId: string, episodeId: string) => {
     try {
+      // PROTOTYPE: Mock close
+      Alert.alert('Success', 'Question closed!');
+      fetchQuestions(episodeId);
+
+      /* SUPABASE CODE COMMENTED OUT
       const { error } = await supabase
         .from('questions')
         .update({ 
@@ -149,6 +188,7 @@ export default function AdminScreen() {
 
       Alert.alert('Success', 'Question closed!');
       fetchQuestions(episodeId);
+      */
     } catch (error: any) {
       Alert.alert('Error', error.message);
     }

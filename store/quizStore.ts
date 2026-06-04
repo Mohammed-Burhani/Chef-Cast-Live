@@ -1,10 +1,12 @@
 /**
- * Live Quiz State Machine
- * Manages quiz flow, timer, answer submission, and scoring
+ * ============================================================================
+ * MOCK QUIZ STORE FOR PROTOTYPE
+ * ============================================================================
+ * Supabase quiz scoring edge functions commented out. Using mock quiz flow.
  */
 
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
 import { useAuthStore } from './authStore';
 import type {
   QuestionActivatedEvent,
@@ -120,6 +122,17 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
     }
 
     try {
+      // PROTOTYPE: Mock episode join
+      set({
+        episodeId,
+        phase: 'idle',
+        totalScore: 0,
+        correctCount: 0,
+        questionCount: 0,
+        questionsHistory: [],
+      });
+
+      /* SUPABASE CODE COMMENTED OUT
       // Register participation
       await supabase
         .from('episode_scores')
@@ -140,6 +153,7 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
         questionCount: 0,
         questionsHistory: [],
       });
+      */
     } catch (error) {
       console.error('[Quiz] Join episode error:', error);
     }
@@ -233,6 +247,20 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
     });
 
     try {
+      // PROTOTYPE: Mock answer scoring
+      const mockIsCorrect = Math.random() > 0.3; // 70% chance correct for demo
+      const mockPoints = mockIsCorrect ? Math.floor(800 + Math.random() * 400) : 0;
+      
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network
+
+      set({
+        isCorrect: mockIsCorrect,
+        totalScore: state.totalScore + mockPoints,
+        correctCount: state.correctCount + (mockIsCorrect ? 1 : 0),
+        isSubmitting: false,
+      });
+
+      /* SUPABASE CODE COMMENTED OUT
       const { data, error } = await supabase.functions.invoke('score-answer', {
         body: {
           questionId: state.currentQuestion.questionId,
@@ -260,6 +288,7 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
         correctCount: data.newCorrectCount,
         isSubmitting: false,
       });
+      */
     } catch (error: any) {
       console.error('[Quiz] Submit answer error:', error);
       set({

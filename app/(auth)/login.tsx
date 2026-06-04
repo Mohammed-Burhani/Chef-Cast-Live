@@ -20,8 +20,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/Button";
 import { useColors } from "@/hooks/useColors";
-import { supabase } from "@/lib/supabase";
-import { signInWithGoogle, signInWithApple, signInAnonymously } from "@/lib/auth";
+// import { supabase } from "@/lib/supabase"; // COMMENTED OUT FOR PROTOTYPE
+// import { signInWithGoogle, signInWithApple, signInAnonymously } from "@/lib/auth"; // COMMENTED OUT FOR PROTOTYPE
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -52,6 +52,17 @@ export default function LoginScreen() {
     setError("");
     setSuccess(false);
 
+    // PROTOTYPE: Mock successful login after short delay
+    setTimeout(() => {
+      setLoading(false);
+      setSuccess(true);
+      // Auto navigate to app after 1s
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 1000);
+    }, 800);
+
+    /* SUPABASE CODE COMMENTED OUT
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
@@ -66,12 +77,20 @@ export default function LoginScreen() {
     } else {
       setSuccess(true);
     }
+    */
   };
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setError("");
     
+    // PROTOTYPE: Mock successful login
+    setTimeout(() => {
+      setGoogleLoading(false);
+      router.replace('/(tabs)');
+    }, 800);
+
+    /* SUPABASE CODE COMMENTED OUT
     const result = await signInWithGoogle();
     
     setGoogleLoading(false);
@@ -79,12 +98,20 @@ export default function LoginScreen() {
     if (!result.success && !result.cancelled) {
       setError("Google sign-in failed. Please try again.");
     }
+    */
   };
 
   const handleAppleSignIn = async () => {
     setAppleLoading(true);
     setError("");
     
+    // PROTOTYPE: Mock successful login
+    setTimeout(() => {
+      setAppleLoading(false);
+      router.replace('/(tabs)');
+    }, 800);
+
+    /* SUPABASE CODE COMMENTED OUT
     const result = await signInWithApple();
     
     setAppleLoading(false);
@@ -92,12 +119,20 @@ export default function LoginScreen() {
     if (!result.success && !result.cancelled) {
       setError("Apple sign-in failed. Please try again.");
     }
+    */
   };
 
   const handleAnonymousSignIn = async () => {
     setAnonLoading(true);
     setError("");
     
+    // PROTOTYPE: Mock successful login
+    setTimeout(() => {
+      setAnonLoading(false);
+      router.replace('/(tabs)');
+    }, 800);
+
+    /* SUPABASE CODE COMMENTED OUT
     const result = await signInAnonymously();
     
     setAnonLoading(false);
@@ -105,6 +140,7 @@ export default function LoginScreen() {
     if (!result.success) {
       setError("Anonymous sign-in failed. Please try again.");
     }
+    */
   };
 
   return (

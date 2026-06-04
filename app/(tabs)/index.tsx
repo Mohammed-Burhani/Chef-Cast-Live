@@ -22,13 +22,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
-import { MOCK_COMMUNITY_POSTS } from "@/constants/mockData";
+import { MOCK_COMMUNITY_POSTS, MOCK_EPISODES } from "@/constants/mockData";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
 import { useEpisodeStore } from "@/store/episodeStore";
-import { supabase } from "@/lib/supabase";
+// import { supabase } from "@/lib/supabase"; // COMMENTED OUT FOR PROTOTYPE
 
 interface Episode {
   id: string;
@@ -141,9 +141,20 @@ export default function HomeScreen() {
   const upcomingEpisodes = episodes.filter((e) => !e.is_live);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
 
-  // Fetch episodes
+  // Fetch episodes - PROTOTYPE: Using mock data
   const fetchEpisodes = async () => {
     try {
+      // MOCK DATA
+      setEpisodes(MOCK_EPISODES.map(ep => ({
+        id: ep.id,
+        title: ep.title,
+        description: ep.description,
+        scheduled_at: ep.broadcastAt,
+        is_live: ep.isLive,
+        thumbnail_url: ep.thumbnailUrl,
+      })));
+
+      /* SUPABASE CODE COMMENTED OUT
       const { data, error } = await supabase
         .from('episodes')
         .select('id, title, description, scheduled_at, is_live, thumbnail_url')
@@ -153,6 +164,7 @@ export default function HomeScreen() {
       if (error) throw error;
 
       setEpisodes(data || []);
+      */
     } catch (error) {
       console.error('[Home] Fetch episodes error:', error);
     } finally {

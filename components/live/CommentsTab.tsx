@@ -24,7 +24,7 @@ import Animated, {
 import { useColors } from '@/hooks/useColors';
 import { useCommentStore, Comment } from '@/store/commentStore';
 import { useQuizPhase } from '@/store/quizStore';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
 import { formatRelativeTime } from '@/lib/utils/time';
 
 interface CommentsTabProps {
@@ -117,6 +117,8 @@ export function CommentsTab({ episodeId, onSwitchToQuiz }: CommentsTabProps) {
   useEffect(() => {
     loadComments(episodeId);
 
+    // PROTOTYPE: Realtime subscription commented out
+    /* SUPABASE CODE COMMENTED OUT
     const channel = supabase
       .channel(`comments:${episodeId}`)
       .on(
@@ -171,6 +173,11 @@ export function CommentsTab({ episodeId, onSwitchToQuiz }: CommentsTabProps) {
 
     return () => {
       channel.unsubscribe();
+      reset();
+    };
+    */
+
+    return () => {
       reset();
     };
   }, [episodeId]);

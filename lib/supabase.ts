@@ -1,3 +1,8 @@
+// ============================================================================
+// SUPABASE INTEGRATION COMMENTED OUT FOR PROTOTYPE
+// ============================================================================
+
+/* 
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
@@ -15,3 +20,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+*/
+
+// Mock Supabase client for prototype
+export const supabase = null as any;
