@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLevelForXP } from "@/constants/gamification";
 import { useColors } from "@/hooks/useColors";
-import { useAuthStore } from "@/store/useAuthStore";
+import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 
 interface SettingRowProps {
@@ -66,8 +66,8 @@ export default function ProfileScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+  const profile = useAuthStore((s) => s.profile);
+  const signOut = useAuthStore((s) => s.signOut);
   const { xpTotal, currentStreak, longestStreak, badges } = useGamificationStore();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -79,7 +79,7 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     if (Platform.OS === "web") {
-      logout();
+      signOut();
       router.replace("/(auth)/welcome");
     } else {
       Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -88,7 +88,7 @@ export default function ProfileScreen() {
           text: "Sign Out",
           style: "destructive",
           onPress: () => {
-            logout();
+            signOut();
             router.replace("/(auth)/welcome");
           },
         },
@@ -107,15 +107,15 @@ export default function ProfileScreen() {
         <View style={[styles.profileHeader, { backgroundColor: colors.surface }]}>
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
             <Text style={styles.avatarInitial}>
-              {user?.displayName?.charAt(0)?.toUpperCase() ?? "C"}
+              {profile?.username?.charAt(0)?.toUpperCase() ?? "C"}
             </Text>
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.displayName, { color: colors.foreground }]}>
-              {user?.displayName ?? "Chef"}
+              {profile?.username ?? "Chef"}
             </Text>
             <Text style={[styles.username, { color: colors.mutedForeground }]}>
-              @{user?.username ?? "user"}
+              @{profile?.username ?? "user"}
             </Text>
             <View style={[styles.levelBadge, { backgroundColor: colors.primary }]}>
               <Text style={styles.levelText}>{currentLevel.name}</Text>
@@ -143,27 +143,25 @@ export default function ProfileScreen() {
         </View>
 
         {/* Subscription card */}
-        {user?.subscriptionTier === "free" && (
-          <TouchableOpacity
-            style={[styles.subscriptionCard, { backgroundColor: colors.surface, borderColor: colors.accent }]}
-            activeOpacity={0.85}
-          >
-            <View style={styles.subCardContent}>
-              <View style={styles.subCardHeader}>
-                <Feather name="zap" size={20} color={colors.accent} />
-                <Text style={[styles.subCardTitle, { color: colors.foreground }]}>
-                  Upgrade to Premium
-                </Text>
-              </View>
-              <Text style={[styles.subCardDesc, { color: colors.mutedForeground }]}>
-                HD cook-along, early recipe access, streak freeze, and more
+        <TouchableOpacity
+          style={[styles.subscriptionCard, { backgroundColor: colors.surface, borderColor: colors.accent }]}
+          activeOpacity={0.85}
+        >
+          <View style={styles.subCardContent}>
+            <View style={styles.subCardHeader}>
+              <Feather name="zap" size={20} color={colors.accent} />
+              <Text style={[styles.subCardTitle, { color: colors.foreground }]}>
+                Upgrade to Premium
               </Text>
             </View>
-            <View style={[styles.subCardBadge, { backgroundColor: colors.accent }]}>
-              <Text style={styles.subCardBadgeText}>$4.99/mo</Text>
-            </View>
-          </TouchableOpacity>
-        )}
+            <Text style={[styles.subCardDesc, { color: colors.mutedForeground }]}>
+              HD cook-along, early recipe access, streak freeze, and more
+            </Text>
+          </View>
+          <View style={[styles.subCardBadge, { backgroundColor: colors.accent }]}>
+            <Text style={styles.subCardBadgeText}>$4.99/mo</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Settings */}
         <View style={[styles.settingsSection, { backgroundColor: colors.surface }]}>
@@ -202,6 +200,13 @@ export default function ProfileScreen() {
           <SettingRow icon="shield" label="Privacy" onPress={() => {}} />
           <SettingRow icon="help-circle" label="Help & Support" onPress={() => {}} />
           <SettingRow icon="info" label="About ChefCast" value="v1.0.0" onPress={() => {}} />
+          {profile?.is_admin && (
+            <SettingRow 
+              icon="settings" 
+              label="Admin Panel" 
+              onPress={() => router.push("/admin" as never)} 
+            />
+          )}
           <SettingRow icon="log-out" label="Sign Out" danger onPress={handleLogout} />
         </View>
 

@@ -21,8 +21,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/Button";
 import { useColors } from "@/hooks/useColors";
-import { useAuthStore } from "@/store/useAuthStore";
-import { UserProfile } from "@/types";
 
 const COOKING_LEVELS = [
   { id: "beginner", label: "Beginner", desc: "Just getting started", icon: "smile" as const },
@@ -41,7 +39,6 @@ const GENDERS = [
 export default function WelcomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { completeOnboarding, login } = useAuthStore();
   const [step, setStep] = useState(0);
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
@@ -61,34 +58,14 @@ export default function WelcomeScreen() {
     } else if (step === 1 && selectedCuisines.length > 0) {
       setStep(2);
     } else if (step === 2 && selectedGender) {
-      await completeOnboarding();
-      router.replace("/(auth)/signup");
+      // Onboarding complete, go to signup
+      router.replace("/(auth)/login");
     }
   };
 
-  const handleAnonymousSignin = async () => {
-    if (step === 0 && !selectedLevel) return;
-    if (step === 1 && selectedCuisines.length === 0) return;
-    if (step === 2 && !selectedGender) return;
-
-    // Create anonymous user
-    const anonUser: UserProfile = {
-      id: `anon-${Date.now()}`,
-      username: `chef_${Math.random().toString(36).substr(2, 6)}`,
-      displayName: "Anonymous Chef",
-      gender: selectedGender || "other",
-      xpTotal: 0,
-      currentStreak: 0,
-      longestStreak: 0,
-      subscriptionTier: "free",
-      cookingLevel: (selectedLevel as any) || "beginner",
-      cuisinePreferences: selectedCuisines,
-      createdAt: new Date().toISOString(),
-    };
-
-    await completeOnboarding();
-    await login(anonUser);
-    router.replace("/(tabs)");
+  const handleSkip = () => {
+    // Skip onboarding, go directly to login
+    router.replace("/(auth)/login");
   };
 
   return (
@@ -240,28 +217,19 @@ export default function WelcomeScreen() {
         )}
 
         <Button
-          title={step === 0 ? "Continue" : step === 1 ? "Continue" : "Create Account"}
+          title={step === 0 ? "Continue" : step === 1 ? "Continue" : "Get Started"}
           disabled={step === 0 ? !selectedLevel : step === 1 ? selectedCuisines.length === 0 : !selectedGender}
           onPress={handleNext}
           style={styles.cta}
         />
 
-        {/* Anonymous signin button */}
+        {/* Skip button */}
         <TouchableOpacity
-          onPress={handleAnonymousSignin}
-          disabled={step === 0 ? !selectedLevel : step === 1 ? selectedCuisines.length === 0 : !selectedGender}
-          style={[
-            styles.anonButton,
-            {
-              backgroundColor: `${colors.neonRed}15`,
-              borderColor: colors.neonRed,
-              opacity: (step === 0 && !selectedLevel) || (step === 1 && selectedCuisines.length === 0) || (step === 2 && !selectedGender) ? 0.4 : 1,
-            },
-          ]}
+          onPress={handleSkip}
+          style={styles.skipButton}
         >
-          <Feather name="user-x" size={16} color={colors.neonRed} />
-          <Text style={[styles.anonButtonText, { color: colors.neonRed }]}>
-            Continue as Guest
+          <Text style={[styles.skipButtonText, { color: colors.mutedForeground }]}>
+            Skip for now
           </Text>
         </TouchableOpacity>
 
@@ -425,6 +393,14 @@ const styles = StyleSheet.create({
   anonButtonText: {
     fontSize: 15,
     fontWeight: "700",
+  },
+  skipButton: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   loginLink: {
     alignItems: "center",

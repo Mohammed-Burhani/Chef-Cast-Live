@@ -22,12 +22,22 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
-import { MOCK_COMMUNITY_POSTS, MOCK_EPISODES } from "@/constants/mockData";
+import { MOCK_COMMUNITY_POSTS } from "@/constants/mockData";
 import { useColors } from "@/hooks/useColors";
-import { useAuthStore } from "@/store/useAuthStore";
+import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
-import { Episode } from "@/types";
+import { useEpisodeStore } from "@/store/episodeStore";
+import { supabase } from "@/lib/supabase";
+
+interface Episode {
+  id: string;
+  title: string;
+  description: string | null;
+  scheduled_at: string;
+  is_live: boolean;
+  thumbnail_url: string | null;
+}
 
 function LiveBadge() {
   const colors = useColors();
@@ -39,9 +49,9 @@ function LiveBadge() {
   );
 }
 
-function CountdownTimer({ broadcastAt }: { broadcastAt: string }) {
+function CountdownTimer({ scheduledAt }: { scheduledAt: string }) {
   const colors = useColors();
-  const diff = new Date(broadcastAt).getTime() - Date.now();
+  const diff = new Date(scheduledAt).getTime() - Date.now();
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -62,7 +72,6 @@ function CountdownTimer({ broadcastAt }: { broadcastAt: string }) {
 
 function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean }) {
   const colors = useColors();
-  const difficultyColors = { easy: colors.success, medium: colors.accent, hard: colors.danger };
 
   return (
     <TouchableOpacity
@@ -76,12 +85,12 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
     >
       <View style={styles.episodeThumb}>
         <Image
-          source={{ uri: episode.thumbnailUrl }}
+          source={{ uri: episode.thumbnail_url || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800' }}
           style={compact ? styles.thumbCompact : styles.thumb}
           contentFit="cover"
           transition={200}
         />
-        {episode.isLive && (
+        {episode.is_live && (
           <View style={styles.liveOverlay}>
             <LiveBadge />
           </View>
@@ -96,22 +105,16 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
         <Text style={[styles.episodeTitle, { color: colors.foreground }]} numberOfLines={2}>
           {episode.title}
         </Text>
-        <Text style={[styles.chefName, { color: colors.mutedForeground }]}>
-          {episode.chefName}
-        </Text>
+        {episode.description && (
+          <Text style={[styles.chefName, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {episode.description}
+          </Text>
+        )}
 
         <View style={styles.episodeMeta}>
-          <View style={[styles.difficultyBadge, { backgroundColor: `${difficultyColors[episode.difficulty]}22` }]}>
-            <Text style={[styles.difficultyText, { color: difficultyColors[episode.difficulty] }]}>
-              {episode.difficulty}
-            </Text>
-          </View>
-          {!episode.isLive && new Date(episode.broadcastAt) > new Date() && (
-            <CountdownTimer broadcastAt={episode.broadcastAt} />
+          {!episode.is_live && new Date(episode.scheduled_at) > new Date() && (
+            <CountdownTimer scheduledAt={episode.scheduled_at} />
           )}
-          <Text style={[styles.duration, { color: colors.mutedForeground }]}>
-            {episode.duration}min
-          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -122,16 +125,44 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
+  const profile = useAuthStore((s) => s.profile);
   const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
+  const setCurrentLiveEpisode = useEpisodeStore((s) => s.setCurrentLiveEpisode);
+  
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const liveEpisode = MOCK_EPISODES.find((e) => e.isLive);
-  const upcomingEpisodes = MOCK_EPISODES.filter((e) => !e.isLive);
+  const liveEpisode = episodes.find((e) => e.is_live);
+  const upcomingEpisodes = episodes.filter((e) => !e.is_live);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
+
+  // Fetch episodes
+  const fetchEpisodes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('episodes')
+        .select('id, title, description, scheduled_at, is_live, thumbnail_url')
+        .order('scheduled_at', { ascending: true })
+        .limit(10);
+
+      if (error) throw error;
+
+      setEpisodes(data || []);
+    } catch (error) {
+      console.error('[Home] Fetch episodes error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchEpisodes();
+  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -142,7 +173,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await new Promise((r) => setTimeout(r, 1000));
+    await fetchEpisodes();
     setRefreshing(false);
   };
 
@@ -177,7 +208,7 @@ export default function HomeScreen() {
             <View>
               <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{getGreeting()},</Text>
               <Text style={[styles.username, { color: colors.foreground }]}>
-                {user?.displayName ?? "Chef"}
+                {profile?.username ?? "Chef"}
               </Text>
             </View>
             <View style={styles.headerRight}>
@@ -206,7 +237,10 @@ export default function HomeScreen() {
               <EpisodeCard episode={liveEpisode} />
               <TouchableOpacity
                 style={[styles.joinButton, { backgroundColor: colors.neonRed }]}
-                onPress={() => router.push("/(tabs)/cook-along" as never)}
+                onPress={() => {
+                  setCurrentLiveEpisode(liveEpisode.id);
+                  router.push("/(tabs)/cook-along" as never);
+                }}
               >
                 <Feather name="zap" size={16} color="#fff" />
                 <Text style={styles.joinButtonText}>Join Live Quiz</Text>
@@ -240,18 +274,20 @@ export default function HomeScreen() {
         </View>
 
         {/* Upcoming Episodes */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Coming Up</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {upcomingEpisodes.map((ep) => (
-              <EpisodeCard key={ep.id} episode={ep} compact />
-            ))}
-          </ScrollView>
-        </View>
+        {!isLoading && upcomingEpisodes.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Coming Up</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {upcomingEpisodes.map((ep) => (
+                <EpisodeCard key={ep.id} episode={ep} compact />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Community Highlights */}
         <View style={styles.section}>

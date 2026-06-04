@@ -1,6 +1,6 @@
 /**
  * Root layout — wraps the entire app with providers.
- * Loads Poppins font, checks auth state, and redirects to the correct route.
+ * Loads Poppins font, initializes auth, handles deep links, and protects routes.
  * Providers: SafeAreaProvider → ErrorBoundary → QueryClient → GestureHandler → Keyboard
  */
 
@@ -13,24 +13,51 @@ import {
 } from "@expo-google-fonts/poppins";
 import { Feather, AntDesign, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Linking from "expo-linking";
 import React, { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useAuthStore } from "@/store/useAuthStore";
+import { useAuthStore } from "@/store/authStore";
+import { handleDeepLink } from "@/lib/auth";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { isLoggedIn, loading } = useAuthStore();
+  const router = useRouter();
+  const segments = useSegments();
+  const { session, isLoading } = useAuthStore();
 
-  if (loading) return null;
+  // Auth-based routing
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!session && !inAuthGroup) {
+      // Not signed in, redirect to auth
+      router.replace('/(auth)/welcome');
+    } else if (session && inAuthGroup) {
+      // Signed in but in auth screens, redirect to app
+      router.replace('/(tabs)');
+    }
+  }, [session, isLoading, segments]);
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0D0D0D', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#E8572A" />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
@@ -45,7 +72,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const { isLoggedIn, isOnboarded, loading, loadFromStorage } = useAuthStore();
+  const { initialize } = useAuthStore();
 
   const [fontsLoaded, fontError] = useFonts({
     // Explicitly load icon fonts so Android resolves them correctly
@@ -59,17 +86,32 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
+  // Initialize auth once on mount
   useEffect(() => {
-    loadFromStorage();
+    initialize();
+  }, []);
+
+  // Handle deep links for magic link callback
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    // Check if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {
-    if ((fontsLoaded || fontError) && !loading) {
+    if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError, loading]);
+  }, [fontsLoaded, fontError]);
 
-  if ((!fontsLoaded && !fontError) || loading) return null;
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>

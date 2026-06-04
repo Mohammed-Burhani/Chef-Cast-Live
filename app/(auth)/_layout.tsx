@@ -1,5 +1,5 @@
 /**
- * Auth stack layout — contains welcome, login, and signup screens.
+ * Auth stack layout — contains welcome and login screens.
  * No header shown; each auth screen handles its own UI.
  */
 
@@ -10,7 +10,6 @@ export default function AuthLayout() {
     <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
       <Stack.Screen name="welcome" />
       <Stack.Screen name="login" />
-      <Stack.Screen name="signup" />
     </Stack>
   );
 }
