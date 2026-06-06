@@ -25,6 +25,8 @@ bun.lockb
 .settings/
 *.sublime-workspace
 
+/android
+
 # IDE - VSCode
 .vscode/*
 !.vscode/settings.json
