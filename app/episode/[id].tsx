@@ -20,7 +20,7 @@ import { useColors } from '@/hooks/useColors';
 import { useQuizStore, useQuizPhase } from '@/store/quizStore';
 import { useCommentStore } from '@/store/commentStore';
 // import { useRealtimeStore } from '@/store/realtimeStore'; // COMMENTED OUT FOR PROTOTYPE
-import { MOCK_EPISODES } from '@/constants/mockData';
+import { MOCK_EPISODES, MOCK_QUIZ_QUESTIONS } from '@/constants/mockData';
 /* REALTIME HOOKS COMMENTED OUT FOR PROTOTYPE
 import {
   useEpisodeChannel,
@@ -52,12 +52,12 @@ export default function LiveEpisodeScreen() {
 
   const phase = useQuizPhase();
   const isQuizActive = phase === 'question' || phase === 'answered';
-  // const isConnectionFailed = useRealtimeStore((s) => s.isAnyChannelFailed()); // COMMENTED OUT
+  // const isConnectionFailed = useRealtimeStore ((s) => s.isAnyChannelFailed()); // COMMENTED OUT
   const isConnectionFailed = false; // PROTOTYPE: no realtime
 
   const {
     joinEpisode,
-    // handleQuestionActivated,
+    handleQuestionActivated, // Need for mock trigger
     // handleQuestionClosed,
     // handleLeaderboardUpdate,
     // handleEpisodeEnded,
@@ -76,7 +76,10 @@ export default function LiveEpisodeScreen() {
           setEpisode({
             id: mockEp.id,
             title: mockEp.title,
-            youtube_stream_url: null,
+            // Mock YouTube live stream for ep-005
+            youtube_stream_url: mockEp.id === 'ep-005' 
+              ? 'https://www.youtube.com/watch?v=jfKfPfyJRdk' 
+              : null,
           });
         }
         setIsLoading(false);
@@ -108,7 +111,30 @@ export default function LiveEpisodeScreen() {
 
     joinEpisode(episode.id);
 
+    // PROTOTYPE: Mock quiz trigger for ep-005 after 3 seconds
+    let quizTimer: NodeJS.Timeout;
+    if (episode.id === 'ep-005') {
+      quizTimer = setTimeout(() => {
+        // Trigger mock question
+        const mockQuestion = MOCK_QUIZ_QUESTIONS[0];
+        useQuizStore.getState().handleQuestionActivated({
+          type: 'QUESTION_ACTIVATED',
+          questionId: mockQuestion.id,
+          episodeId: episode.id,
+          questionText: mockQuestion.text,
+          optionA: mockQuestion.options[0].text,
+          optionB: mockQuestion.options[1].text,
+          optionC: mockQuestion.options[2].text,
+          optionD: mockQuestion.options[3].text,
+          timerSeconds: mockQuestion.timerSeconds,
+          openedAt: new Date().toISOString(),
+          sequenceNumber: 1,
+        });
+      }, 3000);
+    }
+
     return () => {
+      if (quizTimer) clearTimeout(quizTimer);
       resetQuiz();
       resetComments();
     };

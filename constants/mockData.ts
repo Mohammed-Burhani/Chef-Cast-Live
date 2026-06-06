@@ -26,8 +26,8 @@ export const MOCK_EPISODES: Episode[] = [
     description:
       "Join Chef Marco as he guides you through a perfect saffron risotto with wild mushrooms — a dish that demands patience and rewards with perfection.",
     thumbnailUrl: "https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=800",
-    broadcastAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    isLive: true,
+    broadcastAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(), // Tomorrow
+    isLive: false,
     chefName: "Chef Marco Rossi",
     season: 3,
     episodeNumber: 8,
@@ -86,8 +86,8 @@ export const MOCK_EPISODES: Episode[] = [
     description:
       "The ultimate one-pan wonder! Chef Carlos teaches the secrets to perfect socarrat and saffron-infused seafood paella.",
     thumbnailUrl: "https://images.unsplash.com/photo-1534080564583-6be75777b70a?w=800",
-    broadcastAt: new Date(Date.now() + 1000 * 60 * 60 * 120).toISOString(),
-    isLive: false,
+    broadcastAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // Started 15min ago - LIVE NOW
+    isLive: true,
     chefName: "Chef Carlos Mendoza",
     season: 3,
     episodeNumber: 12,
