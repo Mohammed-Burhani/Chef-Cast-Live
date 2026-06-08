@@ -23,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
 import { useCommentStore, Comment } from '@/store/commentStore';
-import { useQuizPhase } from '@/store/quizStore';
+import { useQuizPhase } from '@/store/useQuizStore';
 // import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
 import { formatRelativeTime } from '@/lib/utils/time';
 

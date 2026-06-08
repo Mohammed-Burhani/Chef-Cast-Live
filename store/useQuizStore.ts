@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Live Quiz store using Zustand.
  * Manages the full quiz state machine:
- *   idle → countdown → question → revealing → between → (loop) → complete
+ *   idle ΓåÆ countdown ΓåÆ question ΓåÆ revealing ΓåÆ between ΓåÆ (loop) ΓåÆ complete
  *
  * In production, the host's question pushes arrive via Supabase Realtime.
  * Here we simulate with mock data and manual triggers.
@@ -19,12 +19,12 @@ import {
 } from "@/types";
 
 export type QuizPhase =
-  | "idle"        // No quiz active — show upcoming info + past results
-  | "countdown"   // Quiz is starting — 3-2-1 countdown
-  | "question"    // Question is live — timer running, awaiting answer
-  | "revealing"   // Timer expired or user answered — show correct answer
+  | "idle"        // No quiz active ΓÇö show upcoming info + past results
+  | "countdown"   // Quiz is starting ΓÇö 3-2-1 countdown
+  | "question"    // Question is live ΓÇö timer running, awaiting answer
+  | "revealing"   // Timer expired or user answered ΓÇö show correct answer
   | "between"     // Brief leaderboard snapshot between questions
-  | "complete";   // All questions done — show final leaderboard
+  | "complete";   // All questions done ΓÇö show final leaderboard
 
 interface QuizState {
   phase: QuizPhase;
@@ -58,7 +58,7 @@ interface QuizState {
   /** Countdown number (3, 2, 1) */
   countdownValue: number;
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ Actions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   /** Start a new quiz session */
   startQuiz: () => void;
@@ -90,13 +90,10 @@ interface QuizState {
 
 const STORAGE_KEY = "@chefcast:quizResults";
 
-/** Calculate points for a correct answer based on response speed
- * Base: 100 points per correct answer
- * Speed Bonus: Up to +50 points, scaled linearly by how quickly answered
- */
+/** Calculate points for a correct answer based on response speed */
 function calcPoints(base: number, totalSeconds: number, remainingSeconds: number): number {
   const speedRatio = remainingSeconds / totalSeconds;
-  const speedBonus = Math.round(50 * speedRatio); // Up to +50 points
+  const speedBonus = Math.round(base * 0.5 * speedRatio);
   return base + speedBonus;
 }
 
@@ -123,9 +120,6 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
       sessionScore: 0,
       countdownValue: 3,
     });
-    // Note: Late join handling - viewers who join mid-session see the current
-    // active question and can answer it. Past questions are not replayed;
-    // scoring begins from their first answered question (no penalty for missed questions).
   },
 
   tickCountdown: () => {
@@ -147,8 +141,8 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
     const { phase, selectedOptionId } = get();
     // Lock in only one answer per question
     if (phase !== "question" || selectedOptionId !== null) return;
-    // Just lock the answer - don't reveal yet, let timer reach 0
     set({ selectedOptionId: optionId });
+    // DON'T reveal immediately - timer continues for everyone
   },
 
   revealAnswer: () => {
@@ -172,7 +166,7 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
       responseTimeMs: responseMs,
     };
 
-    // Update leaderboard — inject user's new score at rank 7
+    // Update leaderboard ΓÇö inject user's new score at rank 7
     const newScore = sessionScore + pointsEarned;
     const updatedLeaderboard = MOCK_QUIZ_LEADERBOARD.map((entry) =>
       entry.isCurrentUser ? { ...entry, score: newScore } : entry
@@ -202,7 +196,7 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
     const nextIndex = currentQuestionIndex + 1;
 
     if (nextIndex >= questions.length) {
-      // Quiz complete — save result
+      // Quiz complete ΓÇö save result
       const { sessionScore, userAnswers, pastResults } = get();
       const correctCount = userAnswers.filter((a) => a.isCorrect).length;
       const newResult: QuizEventResult = {
@@ -239,7 +233,7 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
     const { timerRemaining, phase } = get();
     if (phase !== "question") return;
     if (timerRemaining <= 1) {
-      // Time's up — reveal with no answer
+      // Time's up → reveal with whatever answer (or none)
       get().revealAnswer();
     } else {
       set({ timerRemaining: timerRemaining - 1 });
@@ -269,3 +263,28 @@ export const useQuizStore = create<QuizState>()((set, get) => ({
     }
   },
 }));
+
+// Typed selectors
+export const useQuizPhase = () => useQuizStore((s) => s.phase);
+export const useCurrentQuestion = () => {
+  const questions = useQuizStore((s) => s.questions);
+  const index = useQuizStore((s) => s.currentQuestionIndex);
+  return questions[index];
+};
+export const useTimerRemaining = () => useQuizStore((s) => s.timerRemaining);
+export const useSelectedOption = () => useQuizStore((s) => s.selectedOptionId);
+export const useCorrectOption = () => {
+  const questions = useQuizStore((s) => s.questions);
+  const index = useQuizStore((s) => s.currentQuestionIndex);
+  return questions[index]?.correctOptionId;
+};
+export const useIsCorrect = () => {
+  const selectedOptionId = useQuizStore((s) => s.selectedOptionId);
+  const questions = useQuizStore((s) => s.questions);
+  const index = useQuizStore((s) => s.currentQuestionIndex);
+  return selectedOptionId === questions[index]?.correctOptionId;
+};
+export const useTotalScore = () => useQuizStore((s) => s.sessionScore);
+export const useCorrectCount = () => useQuizStore((s) => s.userAnswers.filter(a => a.isCorrect).length);
+export const useCurrentRank = () => useQuizStore((s) => s.liveLeaderboard.find(e => e.isCurrentUser)?.rank ?? null);
+

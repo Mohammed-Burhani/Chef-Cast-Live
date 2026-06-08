@@ -23,7 +23,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { handleDeepLink } from "@/lib/auth";
 
 SplashScreen.preventAutoHideAsync();
@@ -33,25 +33,25 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
-  const { session, isLoading } = useAuthStore();
+  const { isLoggedIn, loading } = useAuthStore();
 
   // Auth-based routing
   useEffect(() => {
-    if (isLoading) return;
+    if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
-    if (!session && !inAuthGroup) {
+    if (!isLoggedIn && !inAuthGroup && segments[0] !== 'splash') {
       // Not signed in, redirect to auth
       router.replace('/(auth)/welcome');
-    } else if (session && inAuthGroup) {
+    } else if (isLoggedIn && inAuthGroup) {
       // Signed in but in auth screens, redirect to app
       router.replace('/(tabs)');
     }
-  }, [session, isLoading, segments]);
+  }, [isLoggedIn, loading, segments]);
 
   // Show loading while checking auth
-  if (isLoading) {
+  if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: '#1A0A2E', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color="#E85200" />
@@ -73,7 +73,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const { initialize } = useAuthStore();
+  const { loadFromStorage } = useAuthStore();
 
   const [fontsLoaded, fontError] = useFonts({
     // Explicitly load icon fonts so Android resolves them correctly
@@ -89,7 +89,7 @@ export default function RootLayout() {
 
   // Initialize auth once on mount
   useEffect(() => {
-    initialize();
+    loadFromStorage();
   }, []);
 
   // Handle deep links for magic link callback

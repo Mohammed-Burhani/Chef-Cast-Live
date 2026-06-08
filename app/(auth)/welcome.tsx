@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/Button";
 import { useColors } from "@/hooks/useColors";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const COOKING_LEVELS = [
   { id: "beginner", label: "Beginner", desc: "Just getting started", icon: "smile" as const },
@@ -66,6 +67,23 @@ export default function WelcomeScreen() {
   const handleSkip = () => {
     // Skip onboarding, go directly to login
     router.replace("/(auth)/login");
+  };
+
+  const handleGuestLogin = async () => {
+    // Create guest user
+    const { login } = useAuthStore.getState();
+    await login({
+      id: `guest-${Date.now()}`,
+      email: "guest@chefcast.live",
+      username: "Guest User",
+      avatar: null,
+      xpTotal: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      role: "viewer",
+      createdAt: new Date().toISOString(),
+    });
+    router.replace("/(tabs)");
   };
 
   return (
@@ -223,6 +241,17 @@ export default function WelcomeScreen() {
           style={styles.cta}
         />
 
+        {/* Guest button */}
+        <TouchableOpacity
+          onPress={handleGuestLogin}
+          style={[styles.guestButton, { borderColor: colors.border }]}
+        >
+          <Feather name="user" size={18} color={colors.primary} />
+          <Text style={[styles.guestButtonText, { color: colors.primary }]}>
+            Continue as Guest
+          </Text>
+        </TouchableOpacity>
+
         {/* Skip button */}
         <TouchableOpacity
           onPress={handleSkip}
@@ -375,6 +404,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
+  },
+  guestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  guestButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
   },
   anonButton: {
     flexDirection: "row",

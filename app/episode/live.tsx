@@ -1,5 +1,6 @@
 /**
- * Live Episode Screen
+ * Live Episode Screen (Current Live Stream)
+ * Route: /episode/live
  * Full live session with video player, quiz, and comments
  */
 
@@ -12,126 +13,66 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { useColors } from '@/hooks/useColors';
-// import { supabase } from '@/lib/supabase'; // COMMENTED OUT FOR PROTOTYPE
 import { useQuizStore, useQuizPhase } from '@/store/useQuizStore';
 import { useCommentStore } from '@/store/commentStore';
-// import { useRealtimeStore } from '@/store/realtimeStore'; // COMMENTED OUT FOR PROTOTYPE
-import { MOCK_EPISODES, MOCK_QUIZ_QUESTIONS } from '@/constants/mockData';
-/* REALTIME HOOKS COMMENTED OUT FOR PROTOTYPE
-import {
-  useEpisodeChannel,
-  useQuestionEvents,
-  useLeaderboardEvents,
-  useEpisodeStateEvents,
-} from '@/lib/realtime';
-*/
+import { MOCK_EPISODES } from '@/constants/mockData';
 
 import { VideoPlayer } from '@/components/live/VideoPlayer';
 import { TabBar } from '@/components/live/TabBar';
 import { QuizTab } from '@/components/live/QuizTab';
 import { CommentsTab } from '@/components/live/CommentsTab';
 
-interface Episode {
-  id: string;
-  title: string;
-  youtube_stream_url: string | null;
-}
-
 export default function LiveEpisodeScreen() {
   const colors = useColors();
-  const { id } = useLocalSearchParams<{ id: string }>();
   const { height } = useWindowDimensions();
 
-  const [episode, setEpisode] = useState<Episode | null>(null);
+  const [episode, setEpisode] = useState<typeof MOCK_EPISODES[0] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'quiz' | 'comments'>('quiz');
 
   const phase = useQuizPhase();
-  const isQuizActive = phase === 'question' || phase === 'answered';
-  // const isConnectionFailed = useRealtimeStore ((s) => s.isAnyChannelFailed()); // COMMENTED OUT
+  const isQuizActive = phase === 'question' || phase === 'revealing';
   const isConnectionFailed = false; // PROTOTYPE: no realtime
 
   const resetQuiz = useQuizStore((s) => s.resetQuiz);
   const { reset: resetComments } = useCommentStore();
 
-  // Fetch episode data
+  // Fetch current live episode (ep-005 for prototype)
   useEffect(() => {
     const fetchEpisode = async () => {
       try {
-        // PROTOTYPE: Using mock data
-        const mockEp = MOCK_EPISODES.find(ep => ep.id === id);
-        if (mockEp) {
-          setEpisode({
-            id: mockEp.id,
-            title: mockEp.title,
-            // Mock YouTube live stream for ep-005
-            youtube_stream_url: mockEp.id === 'ep-005' 
-              ? 'https://www.youtube.com/watch?v=jfKfPfyJRdk' 
-              : null,
-          });
+        // PROTOTYPE: Using ep-005 as current live
+        const liveEp = MOCK_EPISODES.find(ep => ep.id === 'ep-005');
+        if (liveEp) {
+          setEpisode(liveEp);
         }
         setIsLoading(false);
-
-        /* SUPABASE CODE COMMENTED OUT
-        const { data, error } = await supabase
-          .from('episodes')
-          .select('id, title, youtube_stream_url')
-          .eq('id', id)
-          .single();
-
-        if (error) throw error;
-
-        setEpisode(data);
-        setIsLoading(false);
-        */
       } catch (error) {
-        console.error('[Episode] Fetch error:', error);
+        console.error('[LiveEpisode] Fetch error:', error);
         setIsLoading(false);
       }
     };
 
     fetchEpisode();
-  }, [id]);
+  }, []);
 
-  // Join episode and setup Realtime
+  // Start quiz simulation after 3s
   useEffect(() => {
     if (!episode) return;
 
-    // PROTOTYPE: Mock quiz cycle for ep-005
-    let timeouts: NodeJS.Timeout[] = [];
-    if (episode.id === 'ep-005') {
-      // Start quiz after 3s
-      timeouts.push(setTimeout(() => {
-        useQuizStore.getState().startQuiz();
-      }, 3000));
-    }
+    const timeout = setTimeout(() => {
+      useQuizStore.getState().startQuiz();
+    }, 3000);
 
     return () => {
-      timeouts.forEach(clearTimeout);
+      clearTimeout(timeout);
       resetQuiz();
       resetComments();
     };
   }, [episode, resetQuiz, resetComments]);
-
-  // PROTOTYPE: Realtime subscriptions commented out
-  /* SUPABASE REALTIME COMMENTED OUT
-  useEpisodeChannel(episode?.id ?? '');
-
-  useQuestionEvents(episode?.id ?? '', {
-    onActivated: useCallback(handleQuestionActivated, []),
-    onClosed: useCallback(handleQuestionClosed, []),
-  });
-
-  useLeaderboardEvents(episode?.id ?? '', useCallback(handleLeaderboardUpdate, []));
-
-  useEpisodeStateEvents(episode?.id ?? '', {
-    onEnded: useCallback(handleEpisodeEnded, []),
-  });
-  */
 
   if (isLoading) {
     return (
@@ -145,7 +86,7 @@ export default function LiveEpisodeScreen() {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorText, { color: colors.foreground }]}>
-          Episode not found
+          No live episode active
         </Text>
       </View>
     );
@@ -165,7 +106,10 @@ export default function LiveEpisodeScreen() {
 
       {/* Video player */}
       <View style={{ height: videoHeight }}>
-        <VideoPlayer streamUrl={episode.youtube_stream_url} isQuizActive={isQuizActive} />
+        <VideoPlayer 
+          streamUrl="https://www.youtube.com/watch?v=jfKfPfyJRdk" 
+          isQuizActive={isQuizActive} 
+        />
       </View>
 
       {/* Tab area */}
@@ -176,7 +120,7 @@ export default function LiveEpisodeScreen() {
           isQuizActive={isQuizActive}
         />
 
-        {/* Tab content - both rendered, display toggled */}
+        {/* Tab content */}
         <View style={styles.tabContent}>
           <View style={{ display: activeTab === 'quiz' ? 'flex' : 'none', flex: 1 }}>
             <QuizTab episodeId={episode.id} />
