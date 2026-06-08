@@ -146,7 +146,7 @@ export default function LoginScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={[colors.background, "#1A1A2E", colors.background]}
+        colors={[colors.background, "#2A1040", colors.background]}
         style={StyleSheet.absoluteFill}
       />
 

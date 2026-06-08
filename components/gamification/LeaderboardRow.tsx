@@ -10,7 +10,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { LeaderboardEntry } from "@/types";
 
-const MEDAL_COLORS = ["#F5A623", "#C0C0C0", "#CD7F32"];
+const MEDAL_COLORS = ["#FFC200", "#C0C0C0", "#CD7F32"];
 
 interface LeaderboardRowProps {
   entry: LeaderboardEntry;

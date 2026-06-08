@@ -71,7 +71,7 @@ export default function WelcomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={["#E8572A", "#1A1A2E", colors.background]}
+        colors={["#E85200", "#2A1040", colors.background]}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />

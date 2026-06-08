@@ -53,8 +53,8 @@ function RootLayoutNav() {
   // Show loading while checking auth
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0D0D0D', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#E8572A" />
+      <View style={{ flex: 1, backgroundColor: '#1A0A2E', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#E85200" />
       </View>
     );
   }

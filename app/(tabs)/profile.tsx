@@ -3,6 +3,7 @@
  */
 
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -52,7 +53,7 @@ function SettingRow({ icon, label, value, hasToggle, toggleValue, onToggle, dang
           value={toggleValue}
           onValueChange={onToggle}
           trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={toggleValue ? "#fff" : colors.mutedForeground}
+          thumbColor={toggleValue ? "#F5F5F5" : colors.mutedForeground}
         />
       )}
       {!hasToggle && onPress && <Feather name="chevron-right" size={16} color={colors.mutedForeground} />}
@@ -210,6 +211,34 @@ export default function ProfileScreen() {
           <SettingRow icon="log-out" label="Sign Out" danger onPress={handleLogout} />
         </View>
 
+        {/* Sponsors */}
+        <View style={styles.sponsorSection}>
+          <Text style={[styles.sponsorTitle, { color: colors.mutedForeground }]}>PROUDLY SUPPORTED BY</Text>
+          <View style={styles.sponsorLogos}>
+            <View style={[styles.sponsorLogo, { backgroundColor: colors.surface }]}>
+              <Image
+                source={require('@/assets/logos/G_Red.png')}
+                style={styles.sponsorImage}
+                contentFit="contain"
+              />
+            </View>
+            <View style={[styles.sponsorLogo, { backgroundColor: colors.surface }]}>
+              <Image
+                source={require('@/assets/logos/G_Foodilicious_Clean.png')}
+                style={styles.sponsorImage}
+                contentFit="contain"
+              />
+            </View>
+            <View style={[styles.sponsorLogo, { backgroundColor: colors.surface }]}>
+              <Image
+                source={require('@/assets/logos/sponsor-haier.png')}
+                style={styles.sponsorImage}
+                contentFit="contain"
+              />
+            </View>
+          </View>
+        </View>
+
         {/* Cook history preview */}
         <View style={styles.historySection}>
           <Text style={[styles.historyTitle, { color: colors.foreground }]}>Cook History</Text>
@@ -245,7 +274,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, gap: 16 },
   profileHeader: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 20 },
   avatar: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
-  avatarInitial: { fontSize: 28, fontWeight: "800", color: "#fff" },
+  avatarInitial: { fontSize: 28, fontWeight: "800", color: "#F5F5F5" },
   profileInfo: { flex: 1, gap: 4 },
   displayName: { fontSize: 20, fontWeight: "800" },
   username: { fontSize: 13 },
@@ -269,6 +298,11 @@ const styles = StyleSheet.create({
   settingIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   settingLabel: { flex: 1, fontSize: 15 },
   settingValue: { fontSize: 13 },
+  sponsorSection: { gap: 8 },
+  sponsorTitle: { fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+  sponsorLogos: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
+  sponsorLogo: { flex: 1, minWidth: 100, height: 70, borderRadius: 12, padding: 12, alignItems: "center", justifyContent: "center" },
+  sponsorImage: { width: "100%", height: "100%" },
   historySection: { gap: 12 },
   historyTitle: { fontSize: 18, fontWeight: "700" },
   historyRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14 },

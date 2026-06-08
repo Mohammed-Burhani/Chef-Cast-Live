@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   levelText: {
-    color: "#fff",
+    color: "#F5F5F5",
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.5,

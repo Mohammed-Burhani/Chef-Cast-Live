@@ -37,7 +37,7 @@ function Avatar({ username, avatarUrl }: { username: string; avatarUrl: string |
   const colors = useColors();
   
   const getColorFromUsername = (name: string): string => {
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE'];
+    const colors = ['#E85200', '#FFC200', '#FFE500', '#F5A623', '#FF8C00', '#FFB347', '#E3000F'];
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[hash % colors.length];
   };
@@ -213,7 +213,7 @@ export function CommentsTab({ episodeId, onSwitchToQuiz }: CommentsTabProps) {
             activeOpacity={0.8}
           >
             <Text style={styles.bannerText}>❓ Question is live! Tap to switch.</Text>
-            <Feather name="chevron-right" size={18} color="#fff" />
+            <Feather name="chevron-right" size={18} color="#F5F5F5" />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -280,9 +280,9 @@ export function CommentsTab({ episodeId, onSwitchToQuiz }: CommentsTabProps) {
             disabled={!inputText.trim() || isSending}
           >
             {isSending ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#F5F5F5" />
             ) : (
-              <Feather name="send" size={18} color="#fff" />
+              <Feather name="send" size={18} color="#F5F5F5" />
             )}
           </TouchableOpacity>
         </View>
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   bannerText: {
-    color: '#fff',
+    color: '#F5F5F5',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#fff',
+    color: '#F5F5F5',
     fontSize: 16,
     fontWeight: '700',
   },

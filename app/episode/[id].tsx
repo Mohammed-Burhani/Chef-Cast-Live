@@ -181,7 +181,7 @@ export default function LiveEpisodeScreen() {
       {/* Connection lost banner */}
       {isConnectionFailed && (
         <View style={[styles.connectionBanner, { backgroundColor: colors.danger }]}>
-          <Feather name="wifi-off" size={14} color="#fff" />
+          <Feather name="wifi-off" size={14} color="#F5F5F5" />
           <Text style={styles.connectionText}>Connection lost. Reconnecting...</Text>
         </View>
       )}
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   connectionText: {
-    color: '#fff',
+    color: '#F5F5F5',
     fontSize: 13,
     fontWeight: '600',
   },

@@ -92,7 +92,7 @@ export function CookTimer({ totalSeconds }: CookTimerProps) {
           <Feather
             name={timerRunning ? "pause" : isDone ? "check" : "play"}
             size={16}
-            color="#fff"
+            color="#F5F5F5"
           />
         </TouchableOpacity>
 

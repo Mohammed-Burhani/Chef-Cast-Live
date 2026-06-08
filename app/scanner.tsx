@@ -153,7 +153,7 @@ export default function ScannerScreen() {
           <View style={styles.previewArea}>
             <Image source={{ uri: image }} style={styles.previewImage} contentFit="cover" />
             {scanning && (
-              <View style={[styles.scanningOverlay, { backgroundColor: "rgba(0,0,0,0.6)" }]}>
+              <View style={[styles.scanningOverlay, { backgroundColor: "rgba(26,10,46,0.8)" }]}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.scanningText}>Analyzing ingredients...</Text>
               </View>
@@ -167,7 +167,7 @@ export default function ScannerScreen() {
             onPress={takePhoto}
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
           >
-            <Feather name="camera" size={20} color="#fff" />
+            <Feather name="camera" size={20} color="#F5F5F5" />
             <Text style={styles.actionBtnText}>Take Photo</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -221,7 +221,7 @@ export default function ScannerScreen() {
                       borderColor: item.isSelected ? colors.primary : colors.border,
                     }
                   ]}>
-                    {item.isSelected && <Feather name="check" size={11} color="#fff" />}
+                    {item.isSelected && <Feather name="check" size={11} color="#F5F5F5" />}
                   </View>
                   <Text style={[styles.detectedName, { color: item.isSelected ? colors.foreground : colors.mutedForeground }]}>
                     {item.name}
@@ -237,7 +237,7 @@ export default function ScannerScreen() {
             </View>
 
             <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]}>
-              <Feather name="save" size={16} color="#fff" />
+              <Feather name="save" size={16} color="#F5F5F5" />
               <Text style={styles.saveBtnText}>Save to My Pantry</Text>
             </TouchableOpacity>
           </View>
@@ -260,10 +260,10 @@ const styles = StyleSheet.create({
   previewArea: { height: 260, borderRadius: 20, overflow: "hidden", position: "relative" },
   previewImage: { width: "100%", height: "100%" },
   scanningOverlay: { position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: 12 },
-  scanningText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  scanningText: { color: "#F5F5F5", fontSize: 16, fontWeight: "600" },
   actionButtons: { flexDirection: "row", gap: 12 },
   actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
-  actionBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  actionBtnText: { color: "#F5F5F5", fontSize: 15, fontWeight: "700" },
   results: { gap: 14 },
   compatCard: { borderRadius: 16, padding: 16, gap: 8 },
   compatTitle: { fontSize: 14, fontWeight: "600" },
@@ -280,5 +280,5 @@ const styles = StyleSheet.create({
   inRecipeText: { fontSize: 10, fontWeight: "700" },
   confDot: { width: 8, height: 8, borderRadius: 4 },
   saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14 },
-  saveBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  saveBtnText: { color: "#F5F5F5", fontSize: 15, fontWeight: "700" },
 });

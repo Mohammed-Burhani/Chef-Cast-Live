@@ -449,10 +449,10 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
   },
   liveText: {
-    color: '#fff',
+    color: '#F5F5F5',
     fontSize: 10,
     fontWeight: '800',
   },
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeBadgeText: {
-    color: '#fff',
+    color: '#F5F5F5',
     fontSize: 10,
     fontWeight: '800',
   },

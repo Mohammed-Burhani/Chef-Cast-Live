@@ -96,7 +96,7 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
           </View>
         )}
         <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.8)"]}
+          colors={["transparent", "rgba(26,10,46,0.9)"]}
           style={compact ? styles.thumbGradientCompact : styles.thumbGradient}
         />
       </View>
@@ -129,7 +129,7 @@ export default function HomeScreen() {
   const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
   const setCurrentLiveEpisode = useEpisodeStore((s) => s.setCurrentLiveEpisode);
-  
+
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -208,7 +208,7 @@ export default function HomeScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: topPadding + 16, paddingBottom: bottomPadding + 80 }]}
+        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 80 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
@@ -216,6 +216,18 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
+          <View style={styles.headerLogos}>
+            <Image
+              source={require('@/assets/logos/G_Red.png')}
+              style={styles.headerLogo}
+              contentFit="cover"
+            />
+            <Image
+              source={require('@/assets/logos/G_Foodilicious_Clean.png')}
+              style={styles.headerLogoWide}
+              contentFit="cover"
+            />
+          </View>
           <View style={styles.greetingRow}>
             <View>
               <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{getGreeting()},</Text>
@@ -327,7 +339,7 @@ export default function HomeScreen() {
                   transition={200}
                 />
                 <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.7)"]}
+                  colors={["transparent", "rgba(26,10,46,0.85)"]}
                   style={styles.communityGradient}
                 />
                 <View style={styles.communityMeta}>
@@ -376,6 +388,9 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, gap: 24 },
   header: { gap: 8 },
+  headerLogos: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
+  headerLogo: { width: 110, height: 44 },
+  headerLogoWide: { width: 110, height: 32 },
   greetingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   greeting: { fontSize: 14 },
   username: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },

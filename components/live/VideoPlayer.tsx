@@ -61,8 +61,8 @@ function VideoPlayerComponent({ streamUrl, isQuizActive }: VideoPlayerProps) {
         }}
       />
       {isQuizActive && (
-        <View style={[styles.badge, { backgroundColor: 'rgba(0,0,0,0.8)' }]}>
-          <Feather name="lock" size={12} color="#fff" />
+        <View style={[styles.badge, { backgroundColor: 'rgba(26,10,46,0.9)' }]}>
+          <Feather name="lock" size={12} color="#F5F5F5" />
           <Text style={styles.badgeText}>Quiz active — fullscreen locked</Text>
         </View>
       )}
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   badgeText: {
-    color: '#fff',
+    color: '#F5F5F5',
     fontSize: 11,
     fontWeight: '600',
   },

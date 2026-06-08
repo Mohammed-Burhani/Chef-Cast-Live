@@ -176,7 +176,7 @@ export default function MysteryBoxScreen() {
                 opacity: dishIdea.length >= 10 && timeRemaining > 0 ? 1 : 0.4
               }]}
             >
-              <Feather name="send" size={18} color="#fff" />
+              <Feather name="send" size={18} color="#F5F5F5" />
               <Text style={styles.submitBtnText}>Submit Idea (+50 XP)</Text>
             </TouchableOpacity>
 
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   textArea: { fontSize: 15, lineHeight: 22, minHeight: 100 },
   charCount: { fontSize: 11, textAlign: "right", marginTop: 8 },
   submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16 },
-  submitBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  submitBtnText: { color: "#F5F5F5", fontSize: 16, fontWeight: "700" },
   xpHint: { flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" },
   xpHintText: { fontSize: 13 },
   successCard: { borderRadius: 24, borderWidth: 1.5, padding: 24, alignItems: "center", gap: 12 },
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   submissionsTitle: { fontSize: 16, fontWeight: "700" },
   submissionCard: { borderRadius: 16, padding: 14, gap: 8, borderWidth: 1.5 },
   featuredBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  featuredText: { color: "#0D0D0D", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  featuredText: { color: "#1A0A2E", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   submissionHeader: { flexDirection: "row", justifyContent: "space-between" },
   submissionUser: { fontSize: 13, fontWeight: "700" },
   submissionTime: { fontSize: 12 },

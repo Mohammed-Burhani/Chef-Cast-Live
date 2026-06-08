@@ -23,7 +23,7 @@ export function StreakFlame({ streak, size = "md" }: StreakFlameProps) {
   const fontSize = { sm: 12, md: 18, lg: 28 }[size];
 
   const isActive = streak > 0;
-  const flameColor = streak >= 7 ? "#F5A623" : streak >= 3 ? "#FF6B00" : colors.primary;
+  const flameColor = streak >= 7 ? "#FFE500" : streak >= 3 ? "#FFC200" : colors.primary;
 
   useEffect(() => {
     if (!isActive) return;

@@ -60,7 +60,7 @@ export default function LeaderboardScreen() {
             onPress={() => setTimeFilter(f)}
             style={[styles.filterBtn, { backgroundColor: timeFilter === f ? colors.primary : colors.surface }]}
           >
-            <Text style={[styles.filterBtnText, { color: timeFilter === f ? "#fff" : colors.mutedForeground }]}>
+            <Text style={[styles.filterBtnText, { color: timeFilter === f ? "#F5F5F5" : colors.mutedForeground }]}>
               {f === "episode" ? "This Episode" : "All-Time"}
             </Text>
           </TouchableOpacity>
@@ -85,7 +85,7 @@ export default function LeaderboardScreen() {
       {/* Top 3 podium */}
       <View style={[styles.podium, { paddingHorizontal: 20 }]}>
         {[topThree[1], topThree[0], topThree[2]].filter(Boolean).map((entry, displayIdx) => {
-          const medals = ["#C0C0C0", "#F5A623", "#CD7F32"];
+          const medals = ["#C0C0C0", "#FFC200", "#CD7F32"];
           const heights = [80, 100, 65];
           const rankOrder = [2, 1, 3];
           const rankIdx = rankOrder[displayIdx] - 1;
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   listContent: { gap: 0 },
   myRankBar: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, paddingHorizontal: 20, borderTopWidth: 1.5 },
   myRankBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  myRankText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  myRankText: { color: "#F5F5F5", fontSize: 13, fontWeight: "800" },
   myRankName: { flex: 1, fontSize: 15, fontWeight: "600" },
   myRankScore: { fontSize: 15, fontWeight: "700" },
 });

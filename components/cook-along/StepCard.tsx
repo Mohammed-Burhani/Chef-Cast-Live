@@ -42,7 +42,7 @@ export function StepCard({ step, stepNumber, totalSteps, isCompleted }: StepCard
           ]}
         >
           {isCompleted ? (
-            <Feather name="check" size={14} color="#fff" />
+            <Feather name="check" size={14} color="#F5F5F5" />
           ) : (
             <Text style={styles.stepNumber}>{stepNumber}</Text>
           )}
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   stepNumber: {
-    color: "#fff",
+    color: "#F5F5F5",
     fontSize: 14,
     fontWeight: "700",
   },
