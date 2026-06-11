@@ -43,7 +43,8 @@
       "expo-apple-authentication",
       "expo-image",
       "expo-splash-screen",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true,
