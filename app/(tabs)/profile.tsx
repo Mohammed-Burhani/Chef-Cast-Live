@@ -22,6 +22,7 @@ import { getLevelForXP } from "@/constants/gamification";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
+import { useProfile } from "@/lib/api/hooks";
 
 interface SettingRowProps {
   icon: keyof typeof Feather.glyphMap;

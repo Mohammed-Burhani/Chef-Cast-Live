@@ -21,9 +21,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { MOCK_COMMUNITY_POSTS, MOCK_QA } from "@/constants/mockData";
 import { useColors } from "@/hooks/useColors";
 import { useGamificationStore } from "@/store/useGamificationStore";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { useDishPhotos, useToggleLike } from "@/lib/api/hooks";
 import { CommunityPost, QAQuestion } from "@/types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -40,23 +42,18 @@ export default function CommunityScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const [posts, setPosts] = useState<CommunityPost[]>(MOCK_COMMUNITY_POSTS);
-  const [questions, setQuestions] = useState<QAQuestion[]>(MOCK_QA);
+  const { data: dishPhotos = [], isLoading, refetch } = useDishPhotos();
+  const toggleLikeMutation = useToggleLike();
+  
+  const [questions, setQuestions] = useState<QAQuestion[]>([]);
   const [filter, setFilter] = useState<FilterType>("episode");
   const [question, setQuestion] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
 
-  const handleLike = (postId: string) => {
+  const handleLike = async (photoId: string) => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
-          : p
-      )
-    );
+    await toggleLikeMutation.mutateAsync(photoId);
   };
 
   const handleAskChef = () => {

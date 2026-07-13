@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/Button";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/useAuthStore";
+import { signInAnonymously } from "@/lib/auth";
 
 const COOKING_LEVELS = [
   { id: "beginner", label: "Beginner", desc: "Just getting started", icon: "smile" as const },
@@ -60,7 +61,7 @@ export default function WelcomeScreen() {
       setStep(2);
     } else if (step === 2 && selectedGender) {
       // Onboarding complete, go to signup
-      router.replace("/(auth)/login");
+      router.replace("/(auth)/signup");
     }
   };
 
@@ -70,20 +71,27 @@ export default function WelcomeScreen() {
   };
 
   const handleGuestLogin = async () => {
-    // Create guest user
-    const { login } = useAuthStore.getState();
-    await login({
-      id: `guest-${Date.now()}`,
-      email: "guest@chefcast.live",
-      username: "Guest User",
-      avatar: null,
-      xpTotal: 0,
-      currentStreak: 0,
-      longestStreak: 0,
-      role: "viewer",
-      createdAt: new Date().toISOString(),
-    });
-    router.replace("/(tabs)");
+    // Create guest/anonymous user
+    const result = await signInAnonymously();
+    
+    if (result.success) {
+      router.replace("/(tabs)");
+    } else {
+      // Fallback: create mock guest
+      const { login } = useAuthStore.getState();
+      await login({
+        id: `guest-${Date.now()}`,
+        email: "guest@chefcast.live",
+        username: "Guest User",
+        avatar: null,
+        xpTotal: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        role: "viewer",
+        createdAt: new Date().toISOString(),
+      });
+      router.replace("/(tabs)");
+    }
   };
 
   return (

@@ -1,37 +1,20 @@
-/**
- * Authentication store using Zustand.
- * Manages the current user's login state and profile.
- * Persists auth state to AsyncStorage so users stay logged in.
- */
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-
 import { UserProfile } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 interface AuthState {
-  /** Whether the user has completed onboarding */
   isOnboarded: boolean;
-  /** Whether the user is currently logged in */
   isLoggedIn: boolean;
-  /** The current user's profile data */
   user: UserProfile | null;
-  /** Whether we're loading initial state from AsyncStorage */
   loading: boolean;
-
-  /** Load auth state from AsyncStorage on app start */
   loadFromStorage: () => Promise<void>;
-  /** Log in with a user profile (mock — no Supabase in first build) */
   login: (user: UserProfile) => Promise<void>;
-  /** Log out and clear stored credentials */
   logout: () => Promise<void>;
-  /** Mark onboarding as complete */
   completeOnboarding: () => Promise<void>;
-  /** Update the user's profile */
   updateUser: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
-const STORAGE_KEY_USER = "@chefcast:user";
 const STORAGE_KEY_ONBOARDED = "@chefcast:onboarded";
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
@@ -42,33 +25,67 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   loadFromStorage: async () => {
     try {
-      const [userJson, onboardedStr] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEY_USER),
-        AsyncStorage.getItem(STORAGE_KEY_ONBOARDED),
-      ]);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        set({ loading: false, isLoggedIn: false, user: null });
+        return;
+      }
 
-      const user = userJson ? (JSON.parse(userJson) as UserProfile) : null;
-      const isOnboarded = onboardedStr === "true";
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile) {
+        await supabase.from('profiles').insert({
+          id: session.user.id,
+          username: session.user.email?.split('@')[0] || `user_${session.user.id.slice(0, 8)}`,
+          xp: 0,
+        });
+        
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (newProfile) {
+          set({ 
+            user: mapProfile(newProfile, session.user.email), 
+            isLoggedIn: true, 
+            loading: false 
+          });
+        } else {
+          set({ loading: false, isLoggedIn: false });
+        }
+        return;
+      }
+
+      const onboardedStr = await AsyncStorage.getItem(STORAGE_KEY_ONBOARDED);
+      const isOnboarded = onboardedStr === "true" || !!profile.onboarded_at;
 
       set({
-        user,
-        isLoggedIn: !!user,
+        user: mapProfile(profile, session.user.email),
+        isLoggedIn: true,
         isOnboarded,
         loading: false,
       });
-    } catch {
-      set({ loading: false });
+    } catch (err) {
+      console.error('[Auth] Load error:', err);
+      set({ loading: false, isLoggedIn: false, user: null });
     }
   },
 
   login: async (user) => {
-    await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
     set({ user, isLoggedIn: true });
   },
 
   logout: async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY_USER);
-    set({ user: null, isLoggedIn: false });
+    await supabase.auth.signOut();
+    await AsyncStorage.removeItem(STORAGE_KEY_ONBOARDED);
+    set({ user: null, isLoggedIn: false, isOnboarded: false });
   },
 
   completeOnboarding: async () => {
@@ -79,8 +96,34 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   updateUser: async (updates) => {
     const current = get().user;
     if (!current) return;
+    
     const updated = { ...current, ...updates };
-    await AsyncStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-    set({ user: updated });
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        username: updated.username,
+        avatar_url: updated.avatar,
+        xp: updated.xpTotal,
+      })
+      .eq('id', current.id);
+
+    if (!error) {
+      set({ user: updated });
+    }
   },
 }));
+
+function mapProfile(profile: any, email: string | undefined): UserProfile {
+  return {
+    id: profile.id,
+    email: email || '',
+    username: profile.username,
+    avatar: profile.avatar_url,
+    xpTotal: profile.xp || 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    role: profile.is_admin ? 'admin' : 'viewer',
+    createdAt: profile.created_at,
+  };
+}

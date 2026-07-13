@@ -22,12 +22,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
-import { MOCK_COMMUNITY_POSTS, MOCK_EPISODES } from "@/constants/mockData";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
 import { useEpisodeStore } from "@/store/episodeStore";
+import { useLiveEpisode, useEpisodes, useDishPhotos } from "@/lib/api/hooks";
 // import { supabase } from "@/lib/supabase"; // COMMENTED OUT FOR PROTOTYPE
 
 interface Episode {
@@ -130,51 +132,15 @@ export default function HomeScreen() {
   const showPoll = usePollStore((s) => s.showPoll);
   const setCurrentLiveEpisode = useEpisodeStore((s) => s.setCurrentLiveEpisode);
 
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { data: liveEpisode } = useLiveEpisode();
+  const { data: episodes = [], isLoading, refetch } = useEpisodes();
+  const { data: dishPhotos = [] } = useDishPhotos();
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const liveEpisode = episodes.find((e) => e.is_live);
-  const upcomingEpisodes = episodes.filter((e) => !e.is_live);
+  const upcomingEpisodes = episodes.filter((e) => !e.is_live && !e.ended_at);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
-
-  // Fetch episodes - PROTOTYPE: Using mock data
-  const fetchEpisodes = async () => {
-    try {
-      // MOCK DATA
-      setEpisodes(MOCK_EPISODES.map(ep => ({
-        id: ep.id,
-        title: ep.title,
-        description: ep.description,
-        scheduled_at: ep.broadcastAt,
-        is_live: ep.isLive,
-        thumbnail_url: ep.thumbnailUrl,
-      })));
-
-      /* SUPABASE CODE COMMENTED OUT
-      const { data, error } = await supabase
-        .from('episodes')
-        .select('id, title, description, scheduled_at, is_live, thumbnail_url')
-        .order('scheduled_at', { ascending: true })
-        .limit(10);
-
-      if (error) throw error;
-
-      setEpisodes(data || []);
-      */
-    } catch (error) {
-      console.error('[Home] Fetch episodes error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchEpisodes();
-  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -183,11 +149,9 @@ export default function HomeScreen() {
     return "Good evening";
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchEpisodes();
-    setRefreshing(false);
-  };
+  if (isLoading) {
+    return <LoadingSpinner fullScreen />;
+  }
 
   const triggerMockPoll = () => {
     showPoll({
@@ -211,7 +175,7 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 80 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={false} onRefresh={() => refetch()} tintColor={colors.primary} />
         }
       >
         {/* Header */}
@@ -326,14 +290,15 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
           >
-            {MOCK_COMMUNITY_POSTS.slice(0, 3).map((post) => (
+            {(dishPhotos || []).slice(0, 3).map((photo) => (
               <TouchableOpacity
-                key={post.id}
+                key={photo.id}
                 style={styles.communityThumb}
                 activeOpacity={0.85}
+                onPress={() => router.push('/(tabs)/community')}
               >
                 <Image
-                  source={{ uri: post.photoUrl }}
+                  source={{ uri: photo.image_url }}
                   style={styles.communityImage}
                   contentFit="cover"
                   transition={200}
@@ -343,10 +308,10 @@ export default function HomeScreen() {
                   style={styles.communityGradient}
                 />
                 <View style={styles.communityMeta}>
-                  <Text style={styles.communityUsername}>@{post.username}</Text>
+                  <Text style={styles.communityUsername}>@{photo.profiles?.username}</Text>
                   <View style={styles.communityLikes}>
                     <Feather name="heart" size={10} color="#fff" />
-                    <Text style={styles.communityLikeCount}>{post.likes}</Text>
+                    <Text style={styles.communityLikeCount}>{photo.like_count}</Text>
                   </View>
                 </View>
               </TouchableOpacity>

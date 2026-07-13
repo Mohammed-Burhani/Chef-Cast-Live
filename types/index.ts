@@ -4,16 +4,19 @@
 
 export interface UserProfile {
   id: string;
+  email: string;
   username: string;
-  displayName: string;
+  displayName?: string;
+  avatar?: string;
   avatarUrl?: string;
   gender?: "male" | "female" | "other";
   xpTotal: number;
   currentStreak: number;
   longestStreak: number;
   lastCookedAt?: string;
-  subscriptionTier: "free" | "premium";
-  cookingLevel: "beginner" | "home_cook" | "enthusiast";
+  subscriptionTier?: "free" | "premium";
+  cookingLevel?: "beginner" | "home_cook" | "enthusiast";
+  role: "admin" | "viewer";
   createdAt: string;
 }
 

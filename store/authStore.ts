@@ -145,7 +145,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             username,
             avatar_url: user.user_metadata?.avatar_url || null,
           })
-          .select()
+          .select("*")
           .single();
 
         if (insertError) {

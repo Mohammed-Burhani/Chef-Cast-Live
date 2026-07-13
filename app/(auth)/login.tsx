@@ -5,7 +5,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,25 +20,25 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/Button";
 import { useColors } from "@/hooks/useColors";
-// import { supabase } from "@/lib/supabase"; // COMMENTED OUT FOR PROTOTYPE
-// import { signInWithGoogle, signInWithApple, signInAnonymously } from "@/lib/auth"; // COMMENTED OUT FOR PROTOTYPE
+import { supabase } from "@/lib/supabase";
+import { signInWithGoogle, signInWithApple, signInAnonymously } from "@/lib/auth";
 
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [anonLoading, setAnonLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const handleMagicLink = async () => {
-    if (!email.trim()) {
-      setError("Please enter your email");
+    if (!email.trim() || !password.trim()) {
+      setError("Email and password required");
       return;
     }
 
@@ -50,47 +50,29 @@ export default function LoginScreen() {
 
     setLoading(true);
     setError("");
-    setSuccess(false);
 
-    // PROTOTYPE: Mock successful login after short delay
-    setTimeout(() => {
-      setLoading(false);
-      setSuccess(true);
-      // Auto navigate to app after 1s
-      setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (error) {
+        setError(error.message);
+      } else {
         router.replace('/(tabs)');
-      }, 1000);
-    }, 800);
-
-    /* SUPABASE CODE COMMENTED OUT
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        shouldCreateUser: true,
-      },
-    });
-
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setSuccess(true);
+      }
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
-    */
   };
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setError("");
     
-    // PROTOTYPE: Mock successful login
-    setTimeout(() => {
-      setGoogleLoading(false);
-      router.replace('/(tabs)');
-    }, 800);
-
-    /* SUPABASE CODE COMMENTED OUT
     const result = await signInWithGoogle();
     
     setGoogleLoading(false);
@@ -98,20 +80,12 @@ export default function LoginScreen() {
     if (!result.success && !result.cancelled) {
       setError("Google sign-in failed. Please try again.");
     }
-    */
   };
 
   const handleAppleSignIn = async () => {
     setAppleLoading(true);
     setError("");
     
-    // PROTOTYPE: Mock successful login
-    setTimeout(() => {
-      setAppleLoading(false);
-      router.replace('/(tabs)');
-    }, 800);
-
-    /* SUPABASE CODE COMMENTED OUT
     const result = await signInWithApple();
     
     setAppleLoading(false);
@@ -119,20 +93,12 @@ export default function LoginScreen() {
     if (!result.success && !result.cancelled) {
       setError("Apple sign-in failed. Please try again.");
     }
-    */
   };
 
   const handleAnonymousSignIn = async () => {
     setAnonLoading(true);
     setError("");
     
-    // PROTOTYPE: Mock successful login
-    setTimeout(() => {
-      setAnonLoading(false);
-      router.replace('/(tabs)');
-    }, 800);
-
-    /* SUPABASE CODE COMMENTED OUT
     const result = await signInAnonymously();
     
     setAnonLoading(false);
@@ -140,7 +106,6 @@ export default function LoginScreen() {
     if (!result.success) {
       setError("Anonymous sign-in failed. Please try again.");
     }
-    */
   };
 
   return (
@@ -166,15 +131,7 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {success ? (
-            <View style={[styles.successBox, { backgroundColor: `${colors.primary}22`, borderColor: colors.primary }]}>
-              <Feather name="mail" size={20} color={colors.primary} />
-              <Text style={[styles.successText, { color: colors.primary }]}>
-                Check your email for the magic link!
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.form}>
+          <View style={styles.form}>
               <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
                 <Feather name="mail" size={18} color={colors.mutedForeground} />
                 <TextInput
@@ -190,11 +147,26 @@ export default function LoginScreen() {
                 />
               </View>
 
+              <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <Feather name="lock" size={18} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  placeholder="Password"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoComplete="password"
+                  editable={!loading}
+                />
+              </View>
+
               {error ? (
                 <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
               ) : null}
 
-              <Button title="Send Magic Link" loading={loading} onPress={handleMagicLink} />
+              <Button title="Sign In" loading={loading} onPress={handleMagicLink} />
 
               <View style={styles.divider}>
                 <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
@@ -258,14 +230,13 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          )}
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
               New to ChefCast?{" "}
             </Text>
-            <TouchableOpacity onPress={() => router.replace("/(auth)/welcome")}>
-              <Text style={[styles.footerLink, { color: colors.primary }]}>Get started</Text>
+            <TouchableOpacity onPress={() => router.replace("/(auth)/signup")}>
+              <Text style={[styles.footerLink, { color: colors.primary }]}>Sign up</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -307,19 +278,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   error: { fontSize: 13, marginTop: -4 },
-  successBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
-  successText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600",
-  },
   divider: {
     flexDirection: "row",
     alignItems: "center",
