@@ -6,7 +6,7 @@
 
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -42,13 +42,21 @@ const GENDERS = [
 export default function SignupScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
   
+  // Pre-fill from welcome screen if available
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
-  const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
-  const [selectedGender, setSelectedGender] = useState<"male" | "female" | "other" | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(
+    (params.cookingLevel as string) || null
+  );
+  const [selectedCuisines, setSelectedCuisines] = useState<string[]>(
+    params.cuisines ? (params.cuisines as string).split(',') : []
+  );
+  const [selectedGender, setSelectedGender] = useState<"male" | "female" | "other" | null>(
+    (params.gender as "male" | "female" | "other") || null
+  );
   const [step, setStep] = useState(0); // 0: credentials, 1: level, 2: cuisines, 3: gender
   
   const [loading, setLoading] = useState(false);

@@ -60,8 +60,15 @@ export default function WelcomeScreen() {
     } else if (step === 1 && selectedCuisines.length > 0) {
       setStep(2);
     } else if (step === 2 && selectedGender) {
-      // Onboarding complete, go to signup
-      router.replace("/(auth)/signup");
+      // Pass onboarding data to signup
+      router.push({
+        pathname: "/(auth)/signup",
+        params: {
+          cookingLevel: selectedLevel,
+          cuisines: selectedCuisines.join(','),
+          gender: selectedGender,
+        },
+      });
     }
   };
 

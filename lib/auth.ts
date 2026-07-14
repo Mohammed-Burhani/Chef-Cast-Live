@@ -103,7 +103,15 @@ export async function signInWithApple() {
  */
 export async function signInAnonymously() {
   try {
-    const { error } = await supabase.auth.signInAnonymously();
+    const { data, error } = await supabase.auth.signInAnonymously({
+      options: {
+        data: {
+          username: `Guest_${Date.now().toString().slice(-6)}`,
+          cooking_level: 'beginner',
+          onboarded_at: new Date().toISOString(),
+        },
+      },
+    });
 
     if (error) throw error;
 
