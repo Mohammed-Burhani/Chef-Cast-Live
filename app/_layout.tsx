@@ -102,9 +102,9 @@ export default function RootLayout() {
   useEffect(() => {
     loadFromStorage();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
-        await loadFromStorage();
+        loadFromStorage();
       } else if (event === 'SIGNED_OUT') {
         useAuthStore.getState().logout();
       }

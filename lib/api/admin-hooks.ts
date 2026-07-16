@@ -2,7 +2,7 @@
  * Admin React Query hooks
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as adminApi from './admin';
 import { keys } from './hooks';
 
@@ -131,5 +131,68 @@ export function useDeactivateAllQuestions() {
       queryClient.invalidateQueries({ queryKey: keys.questions(episodeId) });
       queryClient.invalidateQueries({ queryKey: keys.activeQuestion(episodeId) });
     },
+  });
+}
+
+// ============================================================================
+// ANALYTICS
+// ============================================================================
+
+export function useEpisodeStats(episodeId: string | null) {
+  return useQuery({
+    queryKey: ['episodeStats', episodeId],
+    queryFn: () => adminApi.getEpisodeStats(episodeId!),
+    enabled: !!episodeId,
+  });
+}
+
+export function useEpisodeParticipants(episodeId: string | null) {
+  return useQuery({
+    queryKey: ['episodeParticipants', episodeId],
+    queryFn: () => adminApi.getEpisodeParticipants(episodeId!),
+    enabled: !!episodeId,
+  });
+}
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
+
+export function useAllUsers(params?: {
+  limit?: number;
+  offset?: number;
+  searchQuery?: string;
+}) {
+  return useQuery({
+    queryKey: ['allUsers', params],
+    queryFn: () => adminApi.getAllUsers(params),
+  });
+}
+
+export function useToggleUserAdmin() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) =>
+      adminApi.toggleUserAdmin(userId, isAdmin),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allUsers'] });
+    },
+  });
+}
+
+export function useUserActivity(userId: string | null) {
+  return useQuery({
+    queryKey: ['userActivity', userId],
+    queryFn: () => adminApi.getUserActivity(userId!),
+    enabled: !!userId,
+  });
+}
+
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: adminApi.getDashboardStats,
+    refetchInterval: 60000, // Refetch every minute
   });
 }

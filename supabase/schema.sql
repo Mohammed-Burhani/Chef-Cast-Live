@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ChefCast Live - Complete Database Schema
--- Single consolidated schema file
+-- Single consolidated schema file with storage buckets
 -- ============================================================================
 
 -- ============================================================================
@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS episodes (
   is_live BOOLEAN DEFAULT FALSE NOT NULL,
   ended_at TIMESTAMPTZ,
   thumbnail_url TEXT,
+  youtube_url TEXT,
+  default_timer_seconds INTEGER DEFAULT 30,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
@@ -154,6 +156,32 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 
 -- ============================================================================
+-- STORAGE BUCKETS
+-- ============================================================================
+
+-- Create dish-photos bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'dish-photos',
+  'dish-photos',
+  true,
+  5242880, -- 5MB
+  ARRAY['image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Create avatars bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'avatars',
+  'avatars',
+  true,
+  2097152, -- 2MB
+  ARRAY['image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
 -- INDEXES
 -- ============================================================================
 
@@ -272,28 +300,129 @@ DROP POLICY IF EXISTS "Users can insert own comments" ON comments;
 CREATE POLICY "Users can insert own comments" ON comments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
 -- ============================================================================
+-- STORAGE POLICIES
+-- ============================================================================
+
+-- Dish photos storage policies
+DROP POLICY IF EXISTS "Public read dish photos" ON storage.objects;
+CREATE POLICY "Public read dish photos"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'dish-photos');
+
+DROP POLICY IF EXISTS "Authenticated upload dish photos" ON storage.objects;
+CREATE POLICY "Authenticated upload dish photos"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'dish-photos');
+
+DROP POLICY IF EXISTS "Users update own dish photos" ON storage.objects;
+CREATE POLICY "Users update own dish photos"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'dish-photos' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+DROP POLICY IF EXISTS "Users delete own dish photos" ON storage.objects;
+CREATE POLICY "Users delete own dish photos"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'dish-photos' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Avatars storage policies
+DROP POLICY IF EXISTS "Public read avatars" ON storage.objects;
+CREATE POLICY "Public read avatars"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "Authenticated upload avatars" ON storage.objects;
+CREATE POLICY "Authenticated upload avatars"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'avatars');
+
+DROP POLICY IF EXISTS "Users update own avatars" ON storage.objects;
+CREATE POLICY "Users update own avatars"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+DROP POLICY IF EXISTS "Users delete own avatars" ON storage.objects;
+CREATE POLICY "Users delete own avatars"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ============================================================================
 -- FUNCTIONS & TRIGGERS
 -- ============================================================================
 
 -- Auto-create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_username TEXT;
+  v_avatar_url TEXT;
+  v_cooking_level TEXT;
+  v_cuisines TEXT[];
+  v_gender TEXT;
+  v_onboarded_at TIMESTAMPTZ;
 BEGIN
-  INSERT INTO public.profiles (id, username, avatar_url, cooking_level, cuisines, gender, onboarded_at)
+  -- Extract username
+  v_username := COALESCE(
+    NEW.raw_user_meta_data->>'username',
+    SPLIT_PART(NEW.email, '@', 1),
+    'user_' || SUBSTRING(NEW.id::TEXT, 1, 8)
+  );
+
+  -- Extract avatar URL
+  v_avatar_url := NEW.raw_user_meta_data->>'avatar_url';
+
+  -- Extract cooking level
+  v_cooking_level := NEW.raw_user_meta_data->>'cooking_level';
+
+  -- Extract cuisines array
+  IF NEW.raw_user_meta_data->>'cuisines' IS NOT NULL THEN
+    v_cuisines := ARRAY(SELECT jsonb_array_elements_text((NEW.raw_user_meta_data->>'cuisines')::jsonb));
+  ELSE
+    v_cuisines := NULL;
+  END IF;
+
+  -- Extract gender
+  v_gender := NEW.raw_user_meta_data->>'gender';
+
+  -- Extract onboarded timestamp
+  IF NEW.raw_user_meta_data->>'onboarded_at' IS NOT NULL THEN
+    v_onboarded_at := (NEW.raw_user_meta_data->>'onboarded_at')::TIMESTAMPTZ;
+  ELSE
+    v_onboarded_at := NULL;
+  END IF;
+
+  -- Insert profile
+  INSERT INTO public.profiles (
+    id,
+    username,
+    avatar_url,
+    cooking_level,
+    cuisines,
+    gender,
+    onboarded_at
+  )
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'username', SPLIT_PART(NEW.email, '@', 1), 'user_' || SUBSTRING(NEW.id::TEXT, 1, 8)),
-    NEW.raw_user_meta_data->>'avatar_url',
-    NEW.raw_user_meta_data->>'cooking_level',
-    CASE WHEN NEW.raw_user_meta_data->>'cuisines' IS NOT NULL 
-      THEN ARRAY(SELECT jsonb_array_elements_text((NEW.raw_user_meta_data->>'cuisines')::jsonb))
-      ELSE NULL END,
-    NEW.raw_user_meta_data->>'gender',
-    CASE WHEN NEW.raw_user_meta_data->>'onboarded_at' IS NOT NULL 
-      THEN (NEW.raw_user_meta_data->>'onboarded_at')::TIMESTAMPTZ
-      ELSE NULL END
+    v_username,
+    v_avatar_url,
+    v_cooking_level,
+    v_cuisines,
+    v_gender,
+    v_onboarded_at
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    username = EXCLUDED.username,
+    avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url),
+    cooking_level = COALESCE(EXCLUDED.cooking_level, profiles.cooking_level),
+    cuisines = COALESCE(EXCLUDED.cuisines, profiles.cuisines),
+    gender = COALESCE(EXCLUDED.gender, profiles.gender),
+    onboarded_at = COALESCE(EXCLUDED.onboarded_at, profiles.onboarded_at);
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
