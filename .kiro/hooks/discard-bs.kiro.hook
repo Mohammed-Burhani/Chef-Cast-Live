@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "discard-bs",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "do not waste your credits in over-explaining just brief in 4-5 words and do not create any summary files"
+  }
+}

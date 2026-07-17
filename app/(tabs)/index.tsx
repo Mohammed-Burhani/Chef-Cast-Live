@@ -131,6 +131,7 @@ export default function HomeScreen() {
   const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
   const setCurrentLiveEpisode = useEpisodeStore((s) => s.setCurrentLiveEpisode);
+  const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
 
   const { data: liveEpisode } = useLiveEpisode();
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
@@ -139,7 +140,9 @@ export default function HomeScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const upcomingEpisodes = episodes.filter((e) => !e.is_live && !e.ended_at);
+  const now = new Date();
+  const upcomingEpisodes = episodes.filter((e) => !e.is_live && !e.ended_at && new Date(e.scheduled_at) > now);
+  const pastEpisodes = episodes.filter((e) => e.ended_at || new Date(e.scheduled_at) < now).slice(0, 3);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
 
   const getGreeting = () => {
@@ -226,12 +229,11 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={[styles.joinButton, { backgroundColor: colors.neonRed }]}
                 onPress={() => {
-                  setCurrentLiveEpisode(liveEpisode.id);
-                  router.push("/(tabs)/cook-along" as never);
+                  router.push(`/live/${liveEpisode.id}` as never);
                 }}
               >
                 <Feather name="zap" size={16} color="#fff" />
-                <Text style={styles.joinButtonText}>Join Live Quiz</Text>
+                <Text style={styles.joinButtonText}>Join Live Session</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -262,20 +264,54 @@ export default function HomeScreen() {
         </View>
 
         {/* Upcoming Episodes */}
-        {!isLoading && upcomingEpisodes.length > 0 && (
+        {!isLoading && (upcomingEpisodes.length > 0 || pastEpisodes.length > 0) && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Coming Up</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Episodes</Text>
+              <TouchableOpacity onPress={() => router.push("/episodes" as never)}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{ flexDirection: 'row', gap: 20, marginBottom: 12 }}>
+              <TouchableOpacity onPress={() => setEpisodeTab('upcoming')} style={{ paddingBottom: 8, borderBottomWidth: episodeTab === 'upcoming' ? 2 : 0, borderBottomColor: colors.primary }}>
+                <Text style={[{ fontSize: 14, fontWeight: '600', color: episodeTab === 'upcoming' ? colors.primary : colors.mutedForeground }]}>Upcoming</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEpisodeTab('past')} style={{ paddingBottom: 8, borderBottomWidth: episodeTab === 'past' ? 2 : 0, borderBottomColor: colors.primary }}>
+                <Text style={[{ fontSize: 14, fontWeight: '600', color: episodeTab === 'past' ? colors.primary : colors.mutedForeground }]}>Past</Text>
+              </TouchableOpacity>
+            </View>
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalScroll}
             >
-              {upcomingEpisodes.map((ep) => (
+              {(episodeTab === 'upcoming' ? upcomingEpisodes : pastEpisodes).map((ep) => (
                 <EpisodeCard key={ep.id} episode={ep} compact />
               ))}
             </ScrollView>
           </View>
         )}
+
+        {/* Recipes (Prototype) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top Recipes</Text>
+            <TouchableOpacity><Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text></TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+            {[1, 2, 3].map((i) => (
+              <TouchableOpacity key={i} style={[{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }]} activeOpacity={0.85}>
+                <Image source={{ uri: `https://images.unsplash.com/photo-155691010${i}-1c02745aae4d?w=400` }} style={{ width: 160, height: 120 }} contentFit="cover" />
+                <View style={{ padding: 10, gap: 4 }}>
+                  <Text style={[{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }]} numberOfLines={2}>Recipe {i}</Text>
+                  <Text style={[{ fontSize: 11, color: colors.mutedForeground }]} numberOfLines={1}>by Chef Marco</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Community Highlights */}
         <View style={styles.section}>

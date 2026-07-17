@@ -4,7 +4,13 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import type { Episode, Question, EpisodeScore, Profile, DishPhoto } from '@/types';
+import type { Database } from '@/types/database';
+
+type Episode = Database['public']['Tables']['episodes']['Row'];
+type Question = Database['public']['Tables']['questions']['Row'];
+type EpisodeScore = Database['public']['Tables']['episode_scores']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type DishPhoto = Database['public']['Tables']['dish_photos']['Row'];
 
 // ============================================================================
 // EPISODES

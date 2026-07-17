@@ -52,7 +52,7 @@ export function AdminSidebar() {
         <Text style={[styles.logoText, { color: colors.foreground }]}>ChefCast Admin</Text>
       </View>
 
-      <ScrollView style={styles.nav} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.nav} contentContainerStyle={styles.navContent} showsVerticalScrollIndicator={false}>
         {NAV_ITEMS.map(item => (
           <TouchableOpacity
             key={item.id}
@@ -88,11 +88,11 @@ export function AdminSidebar() {
             <Text style={styles.avatarText}>{user?.username?.[0]?.toUpperCase()}</Text>
           </View>
           <View style={styles.userDetails}>
-            <Text style={[styles.username, { color: colors.foreground }]}>{user?.username}</Text>
+            <Text style={[styles.username, { color: colors.foreground }]} numberOfLines={1}>{user?.username}</Text>
             <Text style={[styles.role, { color: colors.mutedForeground }]}>Admin</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Feather name="log-out" size={18} color={colors.danger} />
         </TouchableOpacity>
       </View>
@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
   sidebar: {
     width: 240,
     borderRightWidth: 1,
+    flexDirection: 'column',
   },
   sidebarHeader: {
     flexDirection: 'row',
@@ -126,6 +127,9 @@ const styles = StyleSheet.create({
   nav: {
     flex: 1,
     paddingHorizontal: 12,
+  },
+  navContent: {
+    flexGrow: 1,
   },
   navItem: {
     flexDirection: 'row',
@@ -152,6 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   avatar: {
     width: 36,
@@ -167,6 +172,7 @@ const styles = StyleSheet.create({
   },
   userDetails: {
     flex: 1,
+    minWidth: 0,
   },
   username: {
     fontSize: 13,

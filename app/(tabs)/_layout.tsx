@@ -68,15 +68,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="cook-along"
-        options={{
-          title: "Live Quiz",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="zap" size={size - 2} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="community"
         options={{
           title: "Community",
@@ -102,6 +93,10 @@ export default function TabLayout() {
             <Feather name="user" size={size - 2} color={color} />
           ),
         }}
+      />
+      <Tabs.Screen
+        name="cook-along"
+        options={{ href: null }}
       />
     </Tabs>
   );

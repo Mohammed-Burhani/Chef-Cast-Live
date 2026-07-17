@@ -31,16 +31,16 @@ function RootLayoutNav() {
   const { isLoggedIn, loading, user } = useAuthStore();
 
   useEffect(() => {
-    if (loading || !user) return;
+    if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inAdminGroup = segments[0] === '(admin)';
     const inTabsGroup = segments[0] === '(tabs)';
-    const isAdmin = user.role === 'admin';
+    const isAdmin = user?.role === 'admin';
 
     // Not logged in → force to auth
     if (!isLoggedIn && !inAuthGroup && segments[0] !== 'splash') {
-      router.replace('/(auth)/welcome');
+      router.replace('/(auth)/login');
       return;
     }
 
@@ -106,7 +106,8 @@ export default function RootLayout() {
       if (event === 'SIGNED_IN') {
         loadFromStorage();
       } else if (event === 'SIGNED_OUT') {
-        useAuthStore.getState().logout();
+        // State already cleared by logout(), just reload
+        loadFromStorage();
       }
     });
 

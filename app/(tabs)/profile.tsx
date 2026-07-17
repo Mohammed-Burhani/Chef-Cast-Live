@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLevelForXP } from "@/constants/gamification";
 import { useColors } from "@/hooks/useColors";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { useProfile } from "@/lib/api/hooks";
 
@@ -68,8 +68,8 @@ export default function ProfileScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const profile = useAuthStore((s) => s.profile);
-  const signOut = useAuthStore((s) => s.signOut);
+  const profile = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const { xpTotal, currentStreak, longestStreak, badges } = useGamificationStore();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -79,19 +79,19 @@ export default function ProfileScreen() {
   const currentLevel = getLevelForXP(xpTotal);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (Platform.OS === "web") {
-      signOut();
-      router.replace("/(auth)/welcome");
+      await logout();
+      router.replace("/(auth)/login");
     } else {
       Alert.alert("Sign Out", "Are you sure you want to sign out?", [
         { text: "Cancel", style: "cancel" },
         {
           text: "Sign Out",
           style: "destructive",
-          onPress: () => {
-            signOut();
-            router.replace("/(auth)/welcome");
+          onPress: async () => {
+            await logout();
+            router.replace("/(auth)/login");
           },
         },
       ]);
@@ -202,11 +202,11 @@ export default function ProfileScreen() {
           <SettingRow icon="shield" label="Privacy" onPress={() => {}} />
           <SettingRow icon="help-circle" label="Help & Support" onPress={() => {}} />
           <SettingRow icon="info" label="About ChefCast" value="v1.0.0" onPress={() => {}} />
-          {profile?.is_admin && (
+          {profile?.role === 'admin' && (
             <SettingRow 
               icon="settings" 
               label="Admin Panel" 
-              onPress={() => router.push("/admin" as never)} 
+              onPress={() => router.push("/(admin)" as never)} 
             />
           )}
           <SettingRow icon="log-out" label="Sign Out" danger onPress={handleLogout} />
