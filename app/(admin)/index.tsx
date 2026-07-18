@@ -50,7 +50,7 @@ export default function AdminDashboard() {
         <StatCard
           icon="image"
           value={stats?.totalPhotos || 0}
-          label="Community Photos"
+          label="Community Posts"
           iconColor={colors.neonRed}
         />
       </View>
@@ -79,15 +79,24 @@ export default function AdminDashboard() {
 
           <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: colors.accent }]}
-            onPress={() => router.push('/(admin)/users' as any)}
+            onPress={() => router.push('/(admin)/community' as any)}
             activeOpacity={0.8}
           >
             <Feather name="users" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Manage Users</Text>
+            <Text style={styles.actionLabel}>Community</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: colors.warning }]}
+            onPress={() => router.push('/(admin)/users' as any)}
+            activeOpacity={0.8}
+          >
+            <Feather name="user" size={28} color="#fff" />
+            <Text style={styles.actionLabel}>Manage Users</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: colors.success }]}
             onPress={() => router.push('/(admin)/analytics' as any)}
             activeOpacity={0.8}
           >

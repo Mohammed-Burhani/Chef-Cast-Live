@@ -104,11 +104,51 @@ export interface CommunityPost {
   userId: string;
   username: string;
   avatarUrl?: string;
-  episodeTitle: string;
+  episodeTitle?: string;
   photoUrl: string;
   caption: string;
   likes: number;
   isLiked: boolean;
+  comments: number;
+  shares: number;
+  isSaved?: boolean;
+  createdAt: string;
+  location?: string;
+  tags?: string[];
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  text: string;
+  likes: number;
+  isLiked: boolean;
+  createdAt: string;
+  replies?: Comment[];
+  isReply?: boolean;
+  parentCommentId?: string;
+}
+
+export interface Story {
+  id: string;
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  caption?: string;
+  createdAt: string;
+  expiresAt: string;
+  viewers?: string[];
+  isViewed?: boolean;
+}
+
+export interface Follow {
+  followerId: string;
+  followingId: string;
   createdAt: string;
 }
 
@@ -132,19 +172,6 @@ export interface LeaderboardEntry {
   xpTotal: number;
   currentStreak: number;
   isCurrentUser: boolean;
-}
-
-export interface CommunityPost {
-  id: string;
-  userId: string;
-  username: string;
-  avatarUrl?: string;
-  episodeTitle: string;
-  photoUrl: string;
-  caption: string;
-  likes: number;
-  isLiked: boolean;
-  createdAt: string;
 }
 
 export interface MysteryBoxSubmission {

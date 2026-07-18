@@ -1,109 +1,135 @@
 /**
- * Community Feed screen — masonry grid of dish photos + Q&A section.
- * Users can view, like, and submit their own dish photos.
- * Ask the Chef input saves questions to the QA thread.
+ * Community Feed screen — Instagram-like feed with stories, posts, and social interactions
+ * Features: Stories bar, post feed, like/comment/share/save functionality
  */
 
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import React, { useState } from "react";
 import {
-  Dimensions,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useGamificationStore } from "@/store/useGamificationStore";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { ErrorState } from "@/components/ui/ErrorState";
-import { useDishPhotos, useToggleLike } from "@/lib/api/hooks";
-import { CommunityPost, QAQuestion } from "@/types";
+import { useCommunityStore } from "@/store/communityStore";
+import { StoriesBar } from "@/components/community/StoriesBar";
+import { PostCard } from "@/components/community/PostCard";
+import { CreatePostModal } from "@/components/community/CreatePostModal";
+import { CommentsSheet } from "@/components/community/CommentsSheet";
+import { UserProfile } from "@/components/community/UserProfile";
+import { StoryViewer } from "@/components/community/StoryViewer";
+import { CreateStoryModal } from "@/components/community/CreateStoryModal";
+import { Story, CommunityPost } from "@/types";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const COLUMN_GAP = 8;
-const PADDING = 16;
-const COLUMN_WIDTH = (SCREEN_WIDTH - PADDING * 2 - COLUMN_GAP) / 2;
-
-type FilterType = "episode" | "all" | "following";
+type FilterType = "all" | "following";
 
 export default function CommunityScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const awardXP = useGamificationStore((s) => s.awardXP);
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { data: dishPhotos = [], isLoading, refetch } = useDishPhotos();
-  const toggleLikeMutation = useToggleLike();
-  
-  const [questions, setQuestions] = useState<QAQuestion[]>([]);
-  const [filter, setFilter] = useState<FilterType>("episode");
-  const [question, setQuestion] = useState("");
+  const posts = useCommunityStore((s) => s.posts);
+  const isLoadingPosts = useCommunityStore((s) => s.isLoadingPosts);
+  const loadPosts = useCommunityStore((s) => s.loadPosts);
+  const toggleLike = useCommunityStore((s) => s.toggleLike);
+  const toggleSave = useCommunityStore((s) => s.toggleSave);
+  const viewStory = useCommunityStore((s) => s.viewStory);
+  const stories = useCommunityStore((s) => s.stories);
 
-  const handleLike = async (photoId: string) => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    await toggleLikeMutation.mutateAsync(photoId);
-  };
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [refreshing, setRefreshing] = useState(false);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showCreateStory, setShowCreateStory] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [showStoryViewer, setShowStoryViewer] = useState(false);
+  const [storyViewerIndex, setStoryViewerIndex] = useState(0);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  const handleAskChef = () => {
-    if (!question.trim()) return;
-    const newQ: QAQuestion = {
-      id: `qa-${Date.now()}`,
-      userId: "me-user",
-      username: "you",
-      question: question.trim(),
-      upvotes: 0,
-      isAnswered: false,
-      createdAt: new Date().toISOString(),
-    };
-    setQuestions((prev) => [newQ, ...prev]);
-    awardXP("QA_QUESTION_SUBMITTED", "Asked the chef a question");
-    setQuestion("");
-  };
-
-  const onRefresh = async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    await new Promise((r) => setTimeout(r, 800));
+    await loadPosts(filter);
     setRefreshing(false);
   };
 
+  const handleLike = (postId: string) => {
+    toggleLike(postId);
+  };
+
+  const handleSave = (postId: string) => {
+    toggleSave(postId);
+  };
+
+  const handleComment = (postId: string) => {
+    setSelectedPostId(postId);
+    setShowComments(true);
+  };
+
+  const handleShare = (postId: string) => {
+    // TODO: Open share modal
+    console.log("Share post:", postId);
+  };
+
+  const handleUserPress = (userId: string) => {
+    setSelectedUserId(userId);
+    setShowUserProfile(true);
+  };
+
+  const handleHashtagPress = (tag: string) => {
+    // TODO: Navigate to hashtag feed
+    console.log("Navigate to hashtag:", tag);
+  };
+
+  const handleStoryPress = (story: Story) => {
+    const stories = useCommunityStore.getState().stories;
+    const index = stories.findIndex(s => s.id === story.id);
+    setStoryViewerIndex(index >= 0 ? index : 0);
+    setShowStoryViewer(true);
+    viewStory(story.id);
+  };
+
+  const handleCreateStory = () => {
+    setShowCreateStory(true);
+  };
+
   const FILTERS: Array<{ id: FilterType; label: string }> = [
-    { id: "episode", label: "This Episode" },
-    { id: "all", label: "All Time" },
+    { id: "all", label: "All" },
     { id: "following", label: "Following" },
   ];
 
-  // Split posts into two columns for masonry layout
-  const leftColumn = posts.filter((_, i) => i % 2 === 0);
-  const rightColumn = posts.filter((_, i) => i % 2 === 1);
+  const filteredPosts = filter === "following" 
+    ? posts.filter(post => {
+        const following = useCommunityStore.getState().following;
+        return following.includes(post.userId);
+      })
+    : posts;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 80 }]}
+        contentContainerStyle={{ paddingBottom: bottomPadding + 80 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
           <Text style={[styles.title, { color: colors.foreground }]}>Community</Text>
-          <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.neonRed }]}>
-            <Feather name="camera" size={16} color="#fff" />
-            <Text style={styles.shareBtnText}>Share Dish</Text>
+          <TouchableOpacity
+            onPress={() => setShowCreatePost(true)}
+            style={[styles.createPostBtn, { backgroundColor: colors.primary }]}
+          >
+            <Feather name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
 
@@ -112,7 +138,10 @@ export default function CommunityScreen() {
           {FILTERS.map((f) => (
             <TouchableOpacity
               key={f.id}
-              onPress={() => setFilter(f.id)}
+              onPress={() => {
+                setFilter(f.id);
+                loadPosts(f.id);
+              }}
               style={[
                 styles.filterChip,
                 {
@@ -133,164 +162,151 @@ export default function CommunityScreen() {
           ))}
         </View>
 
-        {/* Masonry photo grid */}
-        <View style={styles.masonryGrid}>
-          <View style={styles.masonryColumn}>
-            {leftColumn.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                style={[styles.photoCard, { backgroundColor: colors.surface }]}
-                activeOpacity={0.9}
-              >
-                <Image
-                  source={{ uri: post.photoUrl }}
-                  style={[styles.photoImage, { width: COLUMN_WIDTH, height: COLUMN_WIDTH * 1.3 }]}
-                  contentFit="cover"
-                  transition={200}
-                />
-                <View style={styles.photoMeta}>
-                  <Text style={[styles.photoUsername, { color: colors.foreground }]}>
-                    @{post.username}
-                  </Text>
-                  {post.caption ? (
-                    <Text style={[styles.photoCaption, { color: colors.mutedForeground }]} numberOfLines={2}>
-                      {post.caption}
-                    </Text>
-                  ) : null}
-                  <TouchableOpacity onPress={() => handleLike(post.id)} style={styles.likeRow}>
-                    <Feather name="heart" size={13} color={post.isLiked ? colors.neonRed : colors.mutedForeground} />
-                    <Text style={[styles.likeCount, { color: post.isLiked ? colors.neonRed : colors.mutedForeground }]}>
-                      {post.likes}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Stories Bar */}
+        <StoriesBar
+          onStoryPress={handleStoryPress}
+          onCreateStory={handleCreateStory}
+        />
 
-          <View style={styles.masonryColumn}>
-            {rightColumn.map((post) => (
-              <TouchableOpacity
-                key={post.id}
-                style={[styles.photoCard, { backgroundColor: colors.surface }]}
-                activeOpacity={0.9}
-              >
-                <Image
-                  source={{ uri: post.photoUrl }}
-                  style={[styles.photoImage, { width: COLUMN_WIDTH, height: COLUMN_WIDTH * 1.1 }]}
-                  contentFit="cover"
-                  transition={200}
-                />
-                <View style={styles.photoMeta}>
-                  <Text style={[styles.photoUsername, { color: colors.foreground }]}>
-                    @{post.username}
-                  </Text>
-                  {post.caption ? (
-                    <Text style={[styles.photoCaption, { color: colors.mutedForeground }]} numberOfLines={2}>
-                      {post.caption}
-                    </Text>
-                  ) : null}
-                  <TouchableOpacity onPress={() => handleLike(post.id)} style={styles.likeRow}>
-                    <Feather name="heart" size={13} color={post.isLiked ? colors.neonRed : colors.mutedForeground} />
-                    <Text style={[styles.likeCount, { color: post.isLiked ? colors.neonRed : colors.mutedForeground }]}>
-                      {post.likes}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* Posts Feed */}
+        {filteredPosts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            onLike={handleLike}
+            onComment={handleComment}
+            onShare={handleShare}
+            onSave={handleSave}
+            onUserPress={handleUserPress}
+            onHashtagPress={handleHashtagPress}
+          />
+        ))}
 
-        {/* Ask the Chef section */}
-        <View style={styles.qaSection}>
-          <Text style={[styles.qaTitle, { color: colors.foreground }]}>Ask the Chef</Text>
-          <View style={[styles.qaInput, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <TextInput
-              style={[styles.qaTextInput, { color: colors.foreground }]}
-              placeholder="Ask Chef Marco anything about tonight's recipe..."
-              placeholderTextColor={colors.mutedForeground}
-              value={question}
-              onChangeText={setQuestion}
-              multiline
-            />
-            <TouchableOpacity
-              onPress={handleAskChef}
-              disabled={!question.trim()}
-              style={[styles.qaSendBtn, { backgroundColor: colors.primary, opacity: question.trim() ? 1 : 0.4 }]}
-            >
-              <Feather name="send" size={16} color="#fff" />
-            </TouchableOpacity>
+        {filteredPosts.length === 0 && !isLoadingPosts && (
+          <View style={styles.emptyState}>
+            <Feather name="users" size={48} color={colors.mutedForeground} />
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+              No posts yet
+            </Text>
+            <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
+              Be the first to share your culinary creation!
+            </Text>
           </View>
-
-          {/* QA list */}
-          <View style={styles.qaList}>
-            {questions.map((q) => (
-              <View key={q.id} style={[styles.qaCard, { backgroundColor: colors.surface }]}>
-                <View style={styles.qaHeader}>
-                  <Text style={[styles.qaUsername, { color: colors.primary }]}>@{q.username}</Text>
-                  {q.isAnswered && (
-                    <View style={[styles.answeredBadge, { backgroundColor: `${colors.success}22` }]}>
-                      <Text style={[styles.answeredText, { color: colors.success }]}>Answered</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.qaQuestion, { color: colors.foreground }]}>{q.question}</Text>
-                {q.answer && (
-                  <View style={[styles.answerBox, { backgroundColor: `${colors.primary}15`, borderLeftColor: colors.primary }]}>
-                    <Text style={[styles.answerText, { color: colors.foreground }]}>
-                      <Text style={{ color: colors.primary, fontWeight: "700" }}>Chef: </Text>
-                      {q.answer}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.qaFooter}>
-                  <Feather name="arrow-up" size={13} color={colors.mutedForeground} />
-                  <Text style={[styles.upvotes, { color: colors.mutedForeground }]}>{q.upvotes}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
+        )}
       </ScrollView>
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        visible={showCreatePost}
+        onClose={() => setShowCreatePost(false)}
+      />
+
+      {/* Create Story Modal */}
+      <CreateStoryModal
+        visible={showCreateStory}
+        onClose={() => setShowCreateStory(false)}
+      />
+
+      {/* Comments Sheet */}
+      {selectedPostId && (
+        <CommentsSheet
+          visible={showComments}
+          postId={selectedPostId}
+          onClose={() => {
+            setShowComments(false);
+            setSelectedPostId(null);
+          }}
+        />
+      )}
+
+      {/* User Profile Modal */}
+      {selectedUserId && (
+        <Modal
+          visible={showUserProfile}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => {
+            setShowUserProfile(false);
+            setSelectedUserId(null);
+          }}
+        >
+          <UserProfile
+            userId={selectedUserId}
+            onBack={() => {
+              setShowUserProfile(false);
+              setSelectedUserId(null);
+            }}
+          />
+        </Modal>
+      )}
+
+      {/* Story Viewer */}
+      <StoryViewer
+        visible={showStoryViewer}
+        stories={stories}
+        initialIndex={storyViewerIndex}
+        onClose={() => setShowStoryViewer(false)}
+        onUserPress={handleUserPress}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: PADDING, gap: 20 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 26, fontWeight: "800" },
-  shareBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  shareBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  filterBar: { flexDirection: "row", gap: 8 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  filterLabel: { fontSize: 13, fontWeight: "600" },
-  masonryGrid: { flexDirection: "row", gap: COLUMN_GAP },
-  masonryColumn: { flex: 1, gap: 10 },
-  photoCard: { borderRadius: 14, overflow: "hidden" },
-  photoImage: { borderRadius: 0 },
-  photoMeta: { padding: 10, gap: 5 },
-  photoUsername: { fontSize: 12, fontWeight: "600" },
-  photoCaption: { fontSize: 11, lineHeight: 15 },
-  likeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  likeCount: { fontSize: 11 },
-  qaSection: { gap: 14 },
-  qaTitle: { fontSize: 18, fontWeight: "700" },
-  qaInput: { flexDirection: "row", alignItems: "flex-end", gap: 10, padding: 12, borderRadius: 16, borderWidth: 1 },
-  qaTextInput: { flex: 1, fontSize: 14, lineHeight: 20, maxHeight: 80 },
-  qaSendBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  qaList: { gap: 10 },
-  qaCard: { borderRadius: 14, padding: 14, gap: 8 },
-  qaHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  qaUsername: { fontSize: 12, fontWeight: "700" },
-  answeredBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
-  answeredText: { fontSize: 10, fontWeight: "700" },
-  qaQuestion: { fontSize: 14, lineHeight: 20 },
-  answerBox: { padding: 12, borderRadius: 10, borderLeftWidth: 3 },
-  answerText: { fontSize: 13, lineHeight: 19 },
-  qaFooter: { flexDirection: "row", alignItems: "center", gap: 4 },
-  upvotes: { fontSize: 12 },
+  container: {
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+    maxWidth: "70%",
+    alignSelf: "center"
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  createPostBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterBar: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 64,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: "center",
+  },
 });

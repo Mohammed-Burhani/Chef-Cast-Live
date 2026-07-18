@@ -20,6 +20,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/store/useAuthStore";
 import { handleDeepLink } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { ToastProvider } from "@/utils/toast";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -134,11 +135,13 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
+          <ToastProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <KeyboardProvider>
+                <RootLayoutNav />
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </ToastProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

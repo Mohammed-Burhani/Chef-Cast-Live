@@ -234,6 +234,19 @@ CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authentic
 DROP POLICY IF EXISTS "Authenticated users can view episodes" ON episodes;
 CREATE POLICY "Authenticated users can view episodes" ON episodes FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can insert episodes" ON episodes;
+CREATE POLICY "Admins can insert episodes" ON episodes FOR INSERT TO authenticated 
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can update episodes" ON episodes;
+CREATE POLICY "Admins can update episodes" ON episodes FOR UPDATE TO authenticated 
+  USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can delete episodes" ON episodes;
+CREATE POLICY "Admins can delete episodes" ON episodes FOR DELETE TO authenticated 
+  USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true));
+
 -- Questions policies
 DROP POLICY IF EXISTS "Users can view active or ended questions" ON questions;
 CREATE POLICY "Users can view active or ended questions" ON questions FOR SELECT TO authenticated

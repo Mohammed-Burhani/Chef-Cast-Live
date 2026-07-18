@@ -16,7 +16,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'home', route: '/(admin)' },
   { id: 'episodes', label: 'Episodes', icon: 'tv', route: '/(admin)/episodes' },
   { id: 'live', label: 'Live Control', icon: 'radio', route: '/(admin)/live-control' },
-  { id: 'users', label: 'Users', icon: 'users', route: '/(admin)/users' },
+  { id: 'community', label: 'Community', icon: 'users', route: '/(admin)/community' },
+  { id: 'users', label: 'Users', icon: 'user', route: '/(admin)/users' },
   { id: 'analytics', label: 'Analytics', icon: 'bar-chart-2', route: '/(admin)/analytics' },
   { id: 'settings', label: 'Settings', icon: 'settings', route: '/(admin)/settings' },
 ];
@@ -35,6 +36,7 @@ export function AdminSidebar() {
     if (pathname === '/(admin)' || pathname === '/') return 'dashboard';
     if (pathname.includes('/episodes')) return 'episodes';
     if (pathname.includes('/live-control')) return 'live';
+    if (pathname.includes('/community')) return 'community';
     if (pathname.includes('/users')) return 'users';
     if (pathname.includes('/analytics')) return 'analytics';
     if (pathname.includes('/settings')) return 'settings';

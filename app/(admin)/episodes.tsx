@@ -22,6 +22,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useColors } from '@/hooks/useColors';
 import { useEpisodes } from '@/lib/api/hooks';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/utils/toast';
 import {
   useCreateEpisode,
   useUpdateEpisode,
@@ -178,6 +179,9 @@ export default function AdminEpisodes() {
           updates: payload,
         });
         episodeId = updated.id;
+        
+        setModalVisible(false);
+        toast.success('Episode updated successfully');
       } else {
         const created = await createMutation.mutateAsync(payload);
         episodeId = created.id;
@@ -190,13 +194,12 @@ export default function AdminEpisodes() {
             timer_seconds: useCustomTimers ? q.timer_seconds : formData.default_timer_seconds,
           });
         }
+        
+        setModalVisible(false);
+        toast.success(
+          `Episode created${questions.length > 0 ? ` with ${questions.length} questions` : ''}`
+        );
       }
-
-      setModalVisible(false);
-      Alert.alert(
-        'Success',
-        `Episode ${editingEpisode ? 'updated' : 'created'}${questions.length > 0 ? ` with ${questions.length} questions` : ''}`
-      );
     } catch (err: any) {
       Alert.alert('Error', err.message);
     }
