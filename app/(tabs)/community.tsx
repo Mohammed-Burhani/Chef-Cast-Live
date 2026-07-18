@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
-    maxWidth: "70%",
+    // maxWidth: "70%",
     alignSelf: "center"
   },
   header: {

@@ -8,7 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React from "react";
 import {
   Platform,
   RefreshControl,
@@ -23,7 +23,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { ErrorState } from "@/components/ui/ErrorState";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
@@ -126,18 +125,15 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
-  const setCurrentLiveEpisode = useEpisodeStore((s) => s.setCurrentLiveEpisode);
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
 
   const { data: liveEpisode } = useLiveEpisode();
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
   const { data: dishPhotos = [] } = useDishPhotos();
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
   const now = new Date();
@@ -301,16 +297,81 @@ export default function HomeScreen() {
             <TouchableOpacity><Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text></TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-            {[1, 2, 3].map((i) => (
-              <TouchableOpacity key={i} style={[{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }]} activeOpacity={0.85}>
-                <Image source={{ uri: `https://images.unsplash.com/photo-155691010${i}-1c02745aae4d?w=400` }} style={{ width: 160, height: 120 }} contentFit="cover" />
+            {[
+              { id: 1, title: 'Saffron Risotto', chef: 'Chef Marco', img: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400' },
+              { id: 2, title: 'Duck with Cherry Glaze', chef: 'Chef Sophie', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400' },
+              { id: 3, title: 'French Onion Soup', chef: 'Chef Jean-Pierre', img: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400' },
+            ].map((recipe) => (
+              <TouchableOpacity key={recipe.id} style={[{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }]} activeOpacity={0.85}>
+                <Image source={{ uri: recipe.img }} style={{ width: 160, height: 120 }} contentFit="cover" />
                 <View style={{ padding: 10, gap: 4 }}>
-                  <Text style={[{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }]} numberOfLines={2}>Recipe {i}</Text>
-                  <Text style={[{ fontSize: 11, color: colors.mutedForeground }]} numberOfLines={1}>by Chef Marco</Text>
+                  <Text style={[{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }]} numberOfLines={2}>{recipe.title}</Text>
+                  <Text style={[{ fontSize: 11, color: colors.mutedForeground }]} numberOfLines={1}>by {recipe.chef}</Text>
                 </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+
+        {/* Top Scorer of the Week */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>🏆 Top Scorer This Week</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.topScorerCard, { backgroundColor: colors.surface }]}
+            onPress={() => router.push('/leaderboard' as never)}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={[`${colors.primary}10`, 'transparent']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+            <View style={styles.topScorerLeft}>
+              <Image
+                source={{ uri: 'https://i.pravatar.cc/150?img=33' }}
+                style={styles.topScorerAvatar}
+                contentFit="cover"
+              />
+              <View style={styles.topScorerInfo}>
+                <Text style={[styles.topScorerName, { color: colors.foreground }]}>@culinary_queen</Text>
+                <Text style={[styles.topScorerStats, { color: colors.mutedForeground }]}>8,450 XP • 12 wins</Text>
+              </View>
+            </View>
+            <View style={[styles.crownBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.crownEmoji}>👑</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Admin Posts */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>What's Cooking</Text>
+          </View>
+          <View style={{ gap: 12 }}>
+            {[
+              { id: 1, text: '🔥 New episode tomorrow: "Italian Risotto Night" with Chef Marco!', time: '2h ago' },
+              { id: 2, text: '📢 Mystery Box challenge opens tonight at 8 PM EST. Are you ready?', time: '5h ago' },
+            ].map((post) => (
+              <View key={post.id} style={[styles.postCard, { backgroundColor: colors.surface }]}>
+                <View style={styles.postHeader}>
+                  <Image
+                    source={{ uri: 'https://i.pravatar.cc/150?img=68' }}
+                    style={styles.postAvatar}
+                    contentFit="cover"
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.postUsername, { color: colors.foreground }]}>ChefCast Team</Text>
+                    <Text style={[styles.postTime, { color: colors.mutedForeground }]}>{post.time}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.postText, { color: colors.foreground }]}>{post.text}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Community Highlights */}
@@ -386,7 +447,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { flex: 1 },
+  scroll: { flex: 1, },
   content: { paddingHorizontal: 20, gap: 24 },
   header: { gap: 8 },
   headerLogos: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
@@ -445,4 +506,18 @@ const styles = StyleSheet.create({
   mysteryText: { flex: 1, gap: 3 },
   mysteryTitle: { fontSize: 15, fontWeight: "700" },
   mysterySubtitle: { fontSize: 12, lineHeight: 17 },
+  topScorerCard: { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
+  topScorerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  topScorerAvatar: { width: 50, height: 50, borderRadius: 25 },
+  topScorerInfo: { flex: 1, gap: 2 },
+  topScorerName: { fontSize: 16, fontWeight: '700' },
+  topScorerStats: { fontSize: 12 },
+  crownBadge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  crownEmoji: { fontSize: 22 },
+  postCard: { borderRadius: 14, padding: 14, gap: 10 },
+  postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  postAvatar: { width: 36, height: 36, borderRadius: 18 },
+  postUsername: { fontSize: 13, fontWeight: '600' },
+  postTime: { fontSize: 11 },
+  postText: { fontSize: 14, lineHeight: 20 },
 });
