@@ -43,7 +43,7 @@ export async function toggleEpisodeLive(id: string, isLive: boolean) {
     const { data: liveEpisodes } = await supabase
       .from('episodes')
       .select('id')
-      .eq('is_live', true);
+      .eq('status', 'live');
 
     if (liveEpisodes && liveEpisodes.length > 0) {
       throw new Error('Another episode is already live. Only one stream at a time.');
@@ -51,7 +51,10 @@ export async function toggleEpisodeLive(id: string, isLive: boolean) {
   }
 
   const updates: any = { is_live: isLive };
-  if (!isLive) {
+  if (isLive) {
+    // When going live, clear any previous ended_at
+    updates.ended_at = null;
+  } else {
     updates.ended_at = new Date().toISOString();
   }
 
@@ -167,29 +170,18 @@ export async function toggleQuestionActive(id: string, isActive: boolean) {
   return data;
 }
 
-// Activate question + deactivate all others in episode
+// Activate question + deactivate all others in episode (uses edge function)
 export async function activateQuestionExclusive(episodeId: string, questionId: string) {
-  // Deactivate all questions in episode
-  await supabase
-    .from('questions')
-    .update({ is_active: false, closed_at: new Date().toISOString() })
-    .eq('episode_id', episodeId)
-    .eq('is_active', true);
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session) throw new Error('Not authenticated');
 
-  // Activate target question
-  const { data, error } = await supabase
-    .from('questions')
-    .update({
-      is_active: true,
-      opened_at: new Date().toISOString(),
-      closed_at: null,
-    })
-    .eq('id', questionId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.functions.invoke('activate-question', {
+    body: { questionId, episodeId },
+  });
 
   if (error) throw error;
-  return data;
+  if (data?.error) throw new Error(data.error);
+  return data.question;
 }
 
 // Deactivate all questions in episode
@@ -201,6 +193,20 @@ export async function deactivateAllQuestions(episodeId: string) {
     .eq('is_active', true);
 
   if (error) throw error;
+}
+
+// Close a question (calls edge function)
+export async function closeQuestion(episodeId: string, questionId: string) {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase.functions.invoke('close-question', {
+    body: { questionId, episodeId },
+  });
+
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
 }
 
 // ============================================================================

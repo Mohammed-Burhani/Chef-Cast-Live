@@ -47,7 +47,7 @@ export default function EpisodeDetailScreen() {
     );
   }
 
-  const isPast = new Date(episode.scheduled_at) < new Date() || !!episode.ended_at;
+  const isPast = !!episode.ended_at; // Only past if admin explicitly ended
   const isLive = episode.is_live;
   const isUpcoming = !isLive && !isPast;
 
@@ -133,7 +133,10 @@ export default function EpisodeDetailScreen() {
           <View style={[styles.noticeCard, { backgroundColor: `${colors.accent}15`, borderColor: colors.accent }]}>
             <Feather name="clock" size={18} color={colors.accent} />
             <Text style={[styles.noticeText, { color: colors.foreground }]}>
-              This episode hasn't aired yet. Check back on {new Date(episode.scheduled_at).toLocaleDateString()}.
+              This episode hasn't started yet.
+              {new Date(episode.scheduled_at) > new Date()
+                ? ` Scheduled for ${new Date(episode.scheduled_at).toLocaleDateString()}.`
+                : ' The host will start it shortly.'}
             </Text>
           </View>
         )}

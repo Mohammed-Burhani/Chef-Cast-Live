@@ -62,9 +62,11 @@ export interface Database {
           description: string | null
           scheduled_at: string
           is_live: boolean
+          status: 'scheduled' | 'live' | 'ended'
           ended_at: string | null
           thumbnail_url: string | null
-          youtube_stream_url: string | null
+          youtube_url: string | null
+          default_timer_seconds: number
           created_at: string
         }
         Insert: {
@@ -73,9 +75,11 @@ export interface Database {
           description?: string | null
           scheduled_at: string
           is_live?: boolean
+          status?: 'scheduled' | 'live' | 'ended'
           ended_at?: string | null
           thumbnail_url?: string | null
-          youtube_stream_url?: string | null
+          youtube_url?: string | null
+          default_timer_seconds?: number
           created_at?: string
         }
         Update: {
@@ -84,9 +88,11 @@ export interface Database {
           description?: string | null
           scheduled_at?: string
           is_live?: boolean
+          status?: 'scheduled' | 'live' | 'ended'
           ended_at?: string | null
           thumbnail_url?: string | null
-          youtube_stream_url?: string | null
+          youtube_url?: string | null
+          default_timer_seconds?: number
           created_at?: string
         }
         Relationships: []
@@ -140,6 +146,7 @@ export interface Database {
           correct_option: string
           timer_seconds: number
           is_active: boolean
+          has_been_activated: boolean
           opened_at: string | null
           closed_at: string | null
           sequence_number: number
@@ -156,6 +163,7 @@ export interface Database {
           correct_option: string
           timer_seconds?: number
           is_active?: boolean
+          has_been_activated?: boolean
           opened_at?: string | null
           closed_at?: string | null
           sequence_number: number
@@ -172,6 +180,7 @@ export interface Database {
           correct_option?: string
           timer_seconds?: number
           is_active?: boolean
+          has_been_activated?: boolean
           opened_at?: string | null
           closed_at?: string | null
           sequence_number?: number

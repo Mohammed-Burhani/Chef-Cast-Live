@@ -39,6 +39,14 @@ function LiveBadge() {
 function CountdownTimer({ scheduledAt }: { scheduledAt: string }) {
   const colors = useColors();
   const diff = new Date(scheduledAt).getTime() - Date.now();
+
+  if (diff < 0) {
+    return (
+      <Text style={[styles.countdownText, { color: colors.live }]}>
+        Starting Soon
+      </Text>
+    );
+  }
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -59,8 +67,9 @@ function CountdownTimer({ scheduledAt }: { scheduledAt: string }) {
 
 function EpisodeCard({ episode }: { episode: Episode }) {
   const colors = useColors();
-  const isPast = new Date(episode.scheduled_at) < new Date() || !!episode.ended_at;
-  const isUpcoming = !episode.is_live && !isPast;
+  const isPast = !!episode.ended_at; // Only ended if admin explicitly ended it
+  const isLive = episode.is_live;
+  const isUpcoming = !isLive && !isPast;
 
   return (
     <TouchableOpacity
@@ -127,12 +136,13 @@ export default function EpisodesScreen() {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
 
-  const now = new Date();
+  // Upcoming = not live, not ended (regardless of scheduled_at)
   const upcomingEpisodes = episodes.filter(
-    (ep) => !ep.is_live && !ep.ended_at && new Date(ep.scheduled_at) > now
+    (ep) => !ep.is_live && !ep.ended_at
   );
+  // Past = only episodes admin explicitly ended
   const pastEpisodes = episodes.filter(
-    (ep) => ep.ended_at || new Date(ep.scheduled_at) < now
+    (ep) => ep.ended_at
   );
 
   if (isLoading) {

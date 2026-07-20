@@ -67,7 +67,7 @@ async function fetchLiveEpisode() {
   const { data, error } = await supabase
     .from('episodes')
     .select('*')
-    .eq('is_live', true)
+    .eq('status', 'live')
     .single();
 
   if (error) throw error;

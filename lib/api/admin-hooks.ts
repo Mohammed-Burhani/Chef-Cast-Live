@@ -134,6 +134,20 @@ export function useDeactivateAllQuestions() {
   });
 }
 
+export function useCloseQuestionAdmin() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ episodeId, questionId }: { episodeId: string; questionId: string }) =>
+      adminApi.closeQuestion(episodeId, questionId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: keys.questions(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: keys.activeQuestion(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: keys.leaderboard(data.question?.episode_id) });
+    },
+  });
+}
+
 // ============================================================================
 // ANALYTICS
 // ============================================================================

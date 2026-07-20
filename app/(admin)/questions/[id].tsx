@@ -118,11 +118,18 @@ export default function AdminQuestions() {
             <View key={q.id} style={[styles.card, { backgroundColor: colors.surface }]}>
               <View style={styles.cardHeader}>
                 <Text style={[styles.qNumber, { color: colors.mutedForeground }]}>Q{idx + 1}</Text>
-                {q.is_active && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.success }]}>
-                    <Text style={styles.activeText}>ACTIVE</Text>
-                  </View>
-                )}
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {q.is_active && (
+                    <View style={[styles.activeBadge, { backgroundColor: colors.success }]}>
+                      <Text style={styles.activeText}>ACTIVE</Text>
+                    </View>
+                  )}
+                  {q.has_been_activated && !q.is_active && (
+                    <View style={[styles.activeBadge, { backgroundColor: colors.mutedForeground }]}>
+                      <Text style={styles.activeText}>USED</Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
               <Text style={[styles.qText, { color: colors.foreground }]}>{q.question_text}</Text>
@@ -174,6 +181,11 @@ export default function AdminQuestions() {
                     <Feather name="stop-circle" size={16} color="#fff" />
                     <Text style={[styles.actionText, { color: '#fff' }]}>Deactivate</Text>
                   </TouchableOpacity>
+                ) : q.has_been_activated ? (
+                  <View style={[styles.actionBtn, { backgroundColor: colors.mutedForeground, opacity: 0.6 }]}>
+                    <Feather name="lock" size={16} color="#fff" />
+                    <Text style={[styles.actionText, { color: '#fff' }]}>Already Used</Text>
+                  </View>
                 ) : (
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: colors.success }]}

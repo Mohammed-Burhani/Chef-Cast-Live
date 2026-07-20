@@ -30,6 +30,7 @@ export function useEpisodes() {
   return useQuery({
     queryKey: keys.episodes,
     queryFn: api.fetchEpisodes,
+    refetchInterval: 30000, // Poll every 30s to keep live/ended states fresh
   });
 }
 

@@ -177,45 +177,23 @@ serve(async (req) => {
       throw answerError;
     }
 
-    // Update episode_scores
-    const { data: updatedScore, error: scoreError } = await supabaseClient.rpc(
-      'update_episode_score',
-      {
-        p_user_id: user.id,
-        p_episode_id: episodeId,
-        p_points: totalPoints,
-        p_is_correct: isCorrect,
-      }
-    );
+    // The on_answer_inserted trigger already updates episode_scores.
+    // Fetch the updated values.
+    const { data: updatedScore, error: fetchError } = await supabaseClient
+      .from('episode_scores')
+      .select('total_score, correct_count')
+      .eq('user_id', user.id)
+      .eq('episode_id', episodeId)
+      .single();
 
-    if (scoreError) {
-      console.error('Score update error:', scoreError);
-      // Fallback: manual update
-      const { data: currentScore } = await supabaseClient
-        .from('episode_scores')
-        .select('total_score, correct_count')
-        .eq('user_id', user.id)
-        .eq('episode_id', episodeId)
-        .single();
-
-      const newTotalScore = (currentScore?.total_score ?? 0) + totalPoints;
-      const newCorrectCount = (currentScore?.correct_count ?? 0) + (isCorrect ? 1 : 0);
-
-      await supabaseClient
-        .from('episode_scores')
-        .update({
-          total_score: newTotalScore,
-          correct_count: newCorrectCount,
-        })
-        .eq('user_id', user.id)
-        .eq('episode_id', episodeId);
-
+    if (fetchError) {
+      console.error('Score fetch error:', fetchError);
       return new Response(
         JSON.stringify({
           isCorrect,
           pointsEarned: totalPoints,
-          newTotalScore,
-          newCorrectCount,
+          newTotalScore: totalPoints,
+          newCorrectCount: isCorrect ? 1 : 0,
         }),
         {
           status: 200,
@@ -224,13 +202,12 @@ serve(async (req) => {
       );
     }
 
-    // Return result
     return new Response(
       JSON.stringify({
         isCorrect,
         pointsEarned: totalPoints,
-        newTotalScore: updatedScore.new_total_score,
-        newCorrectCount: updatedScore.new_correct_count,
+        newTotalScore: updatedScore.total_score,
+        newCorrectCount: updatedScore.correct_count,
       }),
       {
         status: 200,

@@ -10,13 +10,14 @@ DECLARE
   ep_004_id UUID := gen_random_uuid();
 BEGIN
   -- Insert episodes
-  INSERT INTO episodes (id, title, description, scheduled_at, is_live, youtube_stream_url, thumbnail_url) VALUES
+  INSERT INTO episodes (id, title, description, scheduled_at, is_live, status, youtube_url, thumbnail_url) VALUES
   (
     ep_live_id,
     'Mastering French Onion Soup',
     'Learn the secrets to perfect caramelized onions and rich beef broth in this classic French bistro dish.',
     NOW() - INTERVAL '30 minutes',
     true,
+    'live',
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800'
   ),
@@ -26,6 +27,7 @@ BEGIN
     'Achieve restaurant-quality crispy skin and perfectly pink duck breast with Chef Sophie''s technique.',
     NOW() + INTERVAL '2 hours',
     false,
+    'scheduled',
     null,
     'https://images.unsplash.com/photo-1544025162-d76694265947?w=800'
   ),
@@ -35,6 +37,7 @@ BEGIN
     'Traditional Roman carbonara with guanciale, pecorino, and the perfect creamy sauce.',
     NOW() + INTERVAL '1 day',
     false,
+    'scheduled',
     null,
     'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800'
   ),
@@ -44,6 +47,7 @@ BEGIN
     'Authentic Thai green curry paste from scratch with coconut milk and fresh herbs.',
     NOW() + INTERVAL '2 days',
     false,
+    'scheduled',
     null,
     'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=800'
   );

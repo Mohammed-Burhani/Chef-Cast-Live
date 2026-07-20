@@ -301,15 +301,13 @@ export default function AdminEpisodes() {
       label: 'Status',
       width: 120,
       render: (ep) => {
-        const isPast = new Date(ep.scheduled_at) < new Date();
-        const status = ep.is_live ? 'live' : ep.ended_at ? 'ended' : isPast ? 'past' : 'upcoming';
+        const status = ep.ended_at ? 'ended' : ep.is_live ? 'live' : 'upcoming';
         const statusColors: Record<string, string> = {
           live: colors.live,
           ended: colors.success,
-          past: colors.mutedForeground,
           upcoming: colors.accent,
         };
-        
+
         return (
           <View style={[styles.statusBadge, { backgroundColor: `${statusColors[status]}22` }]}>
             <Text style={[styles.statusText, { color: statusColors[status] }]}>

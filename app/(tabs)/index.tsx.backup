@@ -8,7 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   Platform,
   RefreshControl,
@@ -23,25 +23,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/authStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
 import { useEpisodeStore } from "@/store/episodeStore";
 import { useLiveEpisode, useEpisodes, useDishPhotos } from "@/lib/api/hooks";
-import { useUpcomingEpisodes } from "@/lib/api/live";
+import type { Database } from '@/types/database';
+// import { supabase } from "@/lib/supabase"; // COMMENTED OUT FOR PROTOTYPE
 
-interface Episode {
-  id: string;
-  title: string;
-  description: string | null;
-  scheduled_at: string;
-  is_live: boolean;
-  status?: 'scheduled' | 'live' | 'ended';
-  ended_at: string | null;
-  thumbnail_url: string | null;
-  youtube_url: string | null;
-}
+type Episode = Database['public']['Tables']['episodes']['Row'];
 
 function LiveBadge() {
   const colors = useColors();
@@ -55,24 +47,7 @@ function LiveBadge() {
 
 function CountdownTimer({ scheduledAt }: { scheduledAt: string }) {
   const colors = useColors();
-  const [now, setNow] = React.useState(Date.now());
-
-  React.useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 60000); // update every minute
-    return () => clearInterval(interval);
-  }, []);
-
-  const diff = new Date(scheduledAt).getTime() - now;
-  const isOverdue = diff < 0;
-
-  if (isOverdue) {
-    return (
-      <Text style={[styles.countdownText, { color: colors.live }]}>
-        Starting Soon
-      </Text>
-    );
-  }
-
+  const diff = new Date(scheduledAt).getTime() - Date.now();
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -145,31 +120,27 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
+  const setCurrentLiveEpisode = useEpisodeStore((s) => s.setCurrentLiveEpisode);
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
 
   const { data: liveEpisode } = useLiveEpisode();
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
   const { data: dishPhotos = [] } = useDishPhotos();
-  const { data: soonLive } = useUpcomingEpisodes();
 
+  const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
   const now = new Date();
-  const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-
-  // Past = only episodes explicitly ended by admin
-  const pastEpisodes = episodes.filter((e) => e.ended_at).slice(0, 3);
-
-  // Upcoming = not live, not ended (regardless of whether scheduled_at is in the past)
-  const episodesNotEnded = episodes.filter((e) => !e.is_live && !e.ended_at);
-
-  // "Future" = scheduled more than 1 hour away
-  const futureEpisodes = episodesNotEnded.filter((e) => {
-    return new Date(e.scheduled_at) > oneHourFromNow;
-  });
+  const upcomingEpisodes = episodes.filter(
+    (e) => !e.is_live && !e.ended_at && new Date(e.scheduled_at) > now
+  );
+  const pastEpisodes = episodes.filter(
+    (e) => e.ended_at || new Date(e.scheduled_at) < now
+  ).slice(0, 3);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
 
   const getGreeting = () => {
@@ -266,70 +237,6 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Going Live Soon — highlight upcoming/live episodes within 1 hour */}
-        {soonLive && soonLive.some(ep => !ep.is_live) && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Going Live Soon</Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
-              {soonLive.filter(ep => !ep.is_live).map((ep) => {
-                const isOverdue = new Date(ep.scheduled_at) <= new Date();
-                return (
-                  <TouchableOpacity
-                    key={ep.id}
-                    activeOpacity={0.85}
-                    onPress={() => router.push(`/live/${ep.id}` as never)}
-                    style={[styles.episodeCard, styles.episodeCardCompact, { backgroundColor: colors.surface }]}
-                  >
-                    <View style={styles.episodeThumb}>
-                      <Image
-                        source={{ uri: ep.thumbnail_url || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800' }}
-                        style={styles.thumbCompact}
-                        contentFit="cover"
-                        transition={200}
-                      />
-                      {/* Accent border for soon-to-be-live */}
-                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: isOverdue ? colors.live : colors.accent, borderRadius: 16 }} />
-                      <View style={{ position: 'absolute', top: 8, right: 8 }}>
-                        <View style={[{ backgroundColor: isOverdue ? colors.live : colors.accent, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }]}>
-                          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>
-                            {isOverdue ? 'OVERDUE' : 'SOON'}
-                          </Text>
-                        </View>
-                      </View>
-                      <LinearGradient
-                        colors={["transparent", "rgba(26,10,46,0.9)"]}
-                        style={styles.thumbGradientCompact}
-                      />
-                    </View>
-                    <View style={styles.episodeInfoCompact}>
-                      <Text style={[styles.episodeTitle, { color: colors.foreground }]} numberOfLines={2}>
-                        {ep.title}
-                      </Text>
-                      <View style={styles.episodeMeta}>
-                        <CountdownTimer scheduledAt={ep.scheduled_at} />
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={[{ backgroundColor: colors.accent, paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginHorizontal: 10, marginBottom: 10 }]}
-                      onPress={() => router.push(`/live/${ep.id}` as never)}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                        {isOverdue ? 'Join Now' : 'Set Reminder'}
-                      </Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-
         {/* Your Progress */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Your Progress</Text>
@@ -354,8 +261,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Episodes List */}
-        {!isLoading && (episodesNotEnded.length > 0 || pastEpisodes.length > 0) && (
+        {/* Upcoming Episodes */}
+        {!isLoading && (upcomingEpisodes.length > 0 || pastEpisodes.length > 0) && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Episodes</Text>
@@ -363,13 +270,36 @@ export default function HomeScreen() {
                 <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
               </TouchableOpacity>
             </View>
-
-            <View style={{ flexDirection: 'row', gap: 20, marginBottom: 12 }}>
-              <TouchableOpacity onPress={() => setEpisodeTab('upcoming')} style={{ paddingBottom: 8, borderBottomWidth: episodeTab === 'upcoming' ? 2 : 0, borderBottomColor: colors.primary }}>
-                <Text style={[{ fontSize: 14, fontWeight: '600', color: episodeTab === 'upcoming' ? colors.primary : colors.mutedForeground }]}>Upcoming</Text>
+            
+            {/* Episode Tabs */}
+            <View style={styles.episodeTabs}>
+              <TouchableOpacity
+                style={[
+                  styles.episodeTab,
+                  episodeTab === 'upcoming' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+                ]}
+                onPress={() => setEpisodeTab('upcoming')}
+              >
+                <Text style={[
+                  styles.episodeTabText,
+                  { color: episodeTab === 'upcoming' ? colors.primary : colors.mutedForeground }
+                ]}>
+                  Upcoming
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setEpisodeTab('past')} style={{ paddingBottom: 8, borderBottomWidth: episodeTab === 'past' ? 2 : 0, borderBottomColor: colors.primary }}>
-                <Text style={[{ fontSize: 14, fontWeight: '600', color: episodeTab === 'past' ? colors.primary : colors.mutedForeground }]}>Past</Text>
+              <TouchableOpacity
+                style={[
+                  styles.episodeTab,
+                  episodeTab === 'past' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+                ]}
+                onPress={() => setEpisodeTab('past')}
+              >
+                <Text style={[
+                  styles.episodeTabText,
+                  { color: episodeTab === 'past' ? colors.primary : colors.mutedForeground }
+                ]}>
+                  Past
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -378,95 +308,52 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalScroll}
             >
-              {(episodeTab === 'upcoming' ? futureEpisodes : pastEpisodes).map((ep) => (
+              {(episodeTab === 'upcoming' ? upcomingEpisodes : pastEpisodes).map((ep) => (
                 <EpisodeCard key={ep.id} episode={ep} compact />
               ))}
             </ScrollView>
           </View>
         )}
 
-        {/* Recipes (Prototype) */}
+        {/* Past Episodes - REMOVED, now in tabs above */
+
+        {/* Recipes Section (Prototype) */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top Recipes</Text>
-            <TouchableOpacity><Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text></TouchableOpacity>
+            <TouchableOpacity>
+              <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+            </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-            {[
-              { id: 1, title: 'Saffron Risotto', chef: 'Chef Marco', img: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400' },
-              { id: 2, title: 'Duck with Cherry Glaze', chef: 'Chef Sophie', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400' },
-              { id: 3, title: 'French Onion Soup', chef: 'Chef Jean-Pierre', img: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400' },
-            ].map((recipe) => (
-              <TouchableOpacity key={recipe.id} style={[{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }]} activeOpacity={0.85}>
-                <Image source={{ uri: recipe.img }} style={{ width: 160, height: 120 }} contentFit="cover" />
-                <View style={{ padding: 10, gap: 4 }}>
-                  <Text style={[{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }]} numberOfLines={2}>{recipe.title}</Text>
-                  <Text style={[{ fontSize: 11, color: colors.mutedForeground }]} numberOfLines={1}>by {recipe.chef}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+          >
+            {[1, 2, 3].map((i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.recipeCard, { backgroundColor: colors.surface }]}
+                activeOpacity={0.85}
+              >
+                <View style={styles.recipeThumb}>
+                  <Image
+                    source={{ uri: `https://images.unsplash.com/photo-155691010${i}-1c02745aae4d?w=400` }}
+                    style={styles.recipeImage}
+                    contentFit="cover"
+                  />
+                </View>
+                <View style={styles.recipeInfo}>
+                  <Text style={[styles.recipeTitle, { color: colors.foreground }]} numberOfLines={2}>
+                    Recipe Title {i}
+                  </Text>
+                  <Text style={[styles.recipeChef, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    by Chef Marco
+                  </Text>
                 </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
-
-        {/* Top Scorer of the Week */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>🏆 Top Scorer This Week</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.topScorerCard, { backgroundColor: colors.surface }]}
-            onPress={() => router.push('/leaderboard' as never)}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={[`${colors.primary}10`, 'transparent']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <View style={styles.topScorerLeft}>
-              <Image
-                source={{ uri: 'https://i.pravatar.cc/150?img=33' }}
-                style={styles.topScorerAvatar}
-                contentFit="cover"
-              />
-              <View style={styles.topScorerInfo}>
-                <Text style={[styles.topScorerName, { color: colors.foreground }]}>@culinary_queen</Text>
-                <Text style={[styles.topScorerStats, { color: colors.mutedForeground }]}>8,450 XP • 12 wins</Text>
-              </View>
-            </View>
-            <View style={[styles.crownBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.crownEmoji}>👑</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Admin Posts */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>What's Cooking</Text>
-          </View>
-          <View style={{ gap: 12 }}>
-            {[
-              { id: 1, text: '🔥 New episode tomorrow: "Italian Risotto Night" with Chef Marco!', time: '2h ago' },
-              { id: 2, text: '📢 Mystery Box challenge opens tonight at 8 PM EST. Are you ready?', time: '5h ago' },
-            ].map((post) => (
-              <View key={post.id} style={[styles.postCard, { backgroundColor: colors.surface }]}>
-                <View style={styles.postHeader}>
-                  <Image
-                    source={{ uri: 'https://i.pravatar.cc/150?img=68' }}
-                    style={styles.postAvatar}
-                    contentFit="cover"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.postUsername, { color: colors.foreground }]}>ChefCast Team</Text>
-                    <Text style={[styles.postTime, { color: colors.mutedForeground }]}>{post.time}</Text>
-                  </View>
-                </View>
-                <Text style={[styles.postText, { color: colors.foreground }]}>{post.text}</Text>
-              </View>
-            ))}
-          </View>
         </View>
 
         {/* Community Highlights */}
@@ -542,7 +429,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { flex: 1, },
+  scroll: { flex: 1 },
   content: { paddingHorizontal: 20, gap: 24 },
   header: { gap: 8 },
   headerLogos: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
@@ -558,6 +445,18 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 18, fontWeight: "700" },
   seeAll: { fontSize: 14, fontWeight: "600" },
+  episodeTabs: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 12,
+  },
+  episodeTab: {
+    paddingBottom: 8,
+  },
+  episodeTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   liveBanner: { borderRadius: 20, padding: 16, borderWidth: 1, gap: 14 },
   liveBannerHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   liveBannerTitle: { fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
@@ -590,6 +489,12 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11 },
   statDivider: { width: 1, height: 40 },
   horizontalScroll: { paddingRight: 20 },
+  recipeCard: { width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12 },
+  recipeThumb: { width: 160, height: 120 },
+  recipeImage: { width: '100%', height: '100%' },
+  recipeInfo: { padding: 10, gap: 4 },
+  recipeTitle: { fontSize: 14, fontWeight: '600', lineHeight: 18 },
+  recipeChef: { fontSize: 11 },
   communityThumb: { width: 140, height: 180, borderRadius: 14, overflow: "hidden", marginRight: 10, position: "relative" },
   communityImage: { width: "100%", height: "100%" },
   communityGradient: { position: "absolute", bottom: 0, left: 0, right: 0, height: 80 },
@@ -601,18 +506,4 @@ const styles = StyleSheet.create({
   mysteryText: { flex: 1, gap: 3 },
   mysteryTitle: { fontSize: 15, fontWeight: "700" },
   mysterySubtitle: { fontSize: 12, lineHeight: 17 },
-  topScorerCard: { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
-  topScorerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  topScorerAvatar: { width: 50, height: 50, borderRadius: 25 },
-  topScorerInfo: { flex: 1, gap: 2 },
-  topScorerName: { fontSize: 16, fontWeight: '700' },
-  topScorerStats: { fontSize: 12 },
-  crownBadge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  crownEmoji: { fontSize: 22 },
-  postCard: { borderRadius: 14, padding: 14, gap: 10 },
-  postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  postAvatar: { width: 36, height: 36, borderRadius: 18 },
-  postUsername: { fontSize: 13, fontWeight: '600' },
-  postTime: { fontSize: 11 },
-  postText: { fontSize: 14, lineHeight: 20 },
 });

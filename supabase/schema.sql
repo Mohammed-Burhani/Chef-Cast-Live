@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS episodes (
   description TEXT,
   scheduled_at TIMESTAMPTZ NOT NULL,
   is_live BOOLEAN DEFAULT FALSE NOT NULL,
+  status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'live', 'ended')) NOT NULL,
   ended_at TIMESTAMPTZ,
   thumbnail_url TEXT,
   youtube_url TEXT,
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS questions (
   correct_option CHAR(1) NOT NULL CHECK (correct_option IN ('a', 'b', 'c', 'd')),
   timer_seconds INTEGER DEFAULT 20 NOT NULL,
   is_active BOOLEAN DEFAULT FALSE NOT NULL,
+  has_been_activated BOOLEAN DEFAULT FALSE NOT NULL,
   opened_at TIMESTAMPTZ,
   closed_at TIMESTAMPTZ,
   sequence_number INTEGER NOT NULL,
@@ -445,6 +447,27 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Sync episode status when is_live or ended_at changes
+CREATE OR REPLACE FUNCTION public.sync_episode_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.is_live = true AND NEW.ended_at IS NULL THEN
+    NEW.status := 'live';
+  ELSIF NEW.ended_at IS NOT NULL THEN
+    NEW.status := 'ended';
+    NEW.is_live := false;
+  ELSE
+    NEW.status := 'scheduled';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_episode_status_sync ON episodes;
+CREATE TRIGGER on_episode_status_sync
+  BEFORE INSERT OR UPDATE OF is_live, ended_at ON episodes
+  FOR EACH ROW EXECUTE FUNCTION public.sync_episode_status();
+
 -- Update episode score after answer
 CREATE OR REPLACE FUNCTION public.update_episode_score()
 RETURNS TRIGGER AS $$
@@ -481,6 +504,24 @@ DROP TRIGGER IF EXISTS on_photo_like_change ON dish_photo_likes;
 CREATE TRIGGER on_photo_like_change
   AFTER INSERT OR DELETE ON dish_photo_likes
   FOR EACH ROW EXECUTE FUNCTION public.update_photo_like_count();
+
+-- Recalculate ranks for all participants in an episode
+CREATE OR REPLACE FUNCTION public.recalculate_episode_ranks(p_episode_id UUID)
+RETURNS void AS $$
+BEGIN
+  WITH ranked AS (
+    SELECT
+      id,
+      ROW_NUMBER() OVER (ORDER BY total_score DESC) as new_rank
+    FROM episode_scores
+    WHERE episode_id = p_episode_id
+  )
+  UPDATE episode_scores es
+  SET rank = ranked.new_rank
+  FROM ranked
+  WHERE es.id = ranked.id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
 -- REALTIME
