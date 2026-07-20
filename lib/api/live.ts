@@ -184,6 +184,24 @@ export async function closeQuestion(episodeId: string, questionId: string) {
 }
 
 /**
+ * Dismiss a question from the live view after answers and results are shown.
+ * Only then can the next question be activated.
+ * Calls the dismiss-question edge function.
+ */
+export async function dismissQuestion(episodeId: string, questionId: string) {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase.functions.invoke('dismiss-question', {
+    body: { questionId, episodeId },
+  });
+
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+/**
  * Submit an answer via the score-answer edge function
  */
 export async function submitAnswerLive(params: {
@@ -342,6 +360,25 @@ export function useCloseQuestion() {
       closeQuestion(episodeId, questionId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: liveKeys.activeQuestion(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: liveKeys.leaderboard(data.question?.episode_id) });
+    },
+  });
+}
+
+/**
+ * Hook: Dismiss question mutation
+ * Dismisses a question after it's been answered and results shown.
+ * Only then can the next question be activated.
+ */
+export function useDismissQuestion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ episodeId, questionId }: { episodeId: string; questionId: string }) =>
+      dismissQuestion(episodeId, questionId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: liveKeys.activeQuestion(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: liveKeys.questions(data.question?.episode_id) });
       queryClient.invalidateQueries({ queryKey: liveKeys.leaderboard(data.question?.episode_id) });
     },
   });

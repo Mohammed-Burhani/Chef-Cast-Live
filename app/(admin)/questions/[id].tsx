@@ -124,9 +124,14 @@ export default function AdminQuestions() {
                       <Text style={styles.activeText}>ACTIVE</Text>
                     </View>
                   )}
-                  {q.has_been_activated && !q.is_active && (
+                  {q.dismissed_at && (
                     <View style={[styles.activeBadge, { backgroundColor: colors.mutedForeground }]}>
-                      <Text style={styles.activeText}>USED</Text>
+                      <Text style={styles.activeText}>FINISHED</Text>
+                    </View>
+                  )}
+                  {q.has_been_activated && !q.is_active && !q.dismissed_at && (
+                    <View style={[styles.activeBadge, { backgroundColor: colors.accent }]}>
+                      <Text style={styles.activeText}>RESULTS</Text>
                     </View>
                   )}
                 </View>
@@ -173,7 +178,12 @@ export default function AdminQuestions() {
               </View>
 
               <View style={styles.cardActions}>
-                {q.is_active ? (
+                {q.dismissed_at ? (
+                  <View style={[styles.actionBtn, { backgroundColor: colors.mutedForeground, opacity: 0.6 }]}>
+                    <Feather name="lock" size={16} color="#fff" />
+                    <Text style={[styles.actionText, { color: '#fff' }]}>Finished</Text>
+                  </View>
+                ) : q.is_active ? (
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: colors.danger }]}
                     onPress={() => handleDeactivate(q.id)}

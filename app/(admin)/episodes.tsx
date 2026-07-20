@@ -47,8 +47,8 @@ export default function AdminEpisodes() {
   const { data: episodes = [], isLoading } = useEpisodes();
   const createMutation = useCreateEpisode();
   const updateMutation = useUpdateEpisode();
-  const toggleLiveMutation = useToggleEpisodeLive();
   const deleteMutation = useDeleteEpisode();
+  const toggleLiveMutation = useToggleEpisodeLive();
   const createQuestionMutation = useCreateQuestion();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -205,27 +205,6 @@ export default function AdminEpisodes() {
     }
   };
 
-  const handleGoLive = (episode: any) => {
-    Alert.alert(
-      'Go Live',
-      `Start streaming "${episode.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Go Live',
-          onPress: async () => {
-            try {
-              await toggleLiveMutation.mutateAsync({ episodeId: episode.id, isLive: true });
-              Alert.alert('Success', 'Episode is now live!');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleStopLive = (episode: any) => {
     Alert.alert(
       'Stop Stream',
@@ -309,10 +288,17 @@ export default function AdminEpisodes() {
         };
 
         return (
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColors[status]}22` }]}>
-            <Text style={[styles.statusText, { color: statusColors[status] }]}>
-              {status.toUpperCase()}
-            </Text>
+          <View>
+            <View style={[styles.statusBadge, { backgroundColor: `${statusColors[status]}22` }]}>
+              <Text style={[styles.statusText, { color: statusColors[status] }]}>
+                {status.toUpperCase()}
+              </Text>
+            </View>
+            {status === 'upcoming' && (
+              <Text style={[styles.scheduleHint, { color: colors.mutedForeground }]}>
+                Auto-live at scheduled time
+              </Text>
+            )}
           </View>
         );
       },
@@ -320,7 +306,7 @@ export default function AdminEpisodes() {
     {
       key: 'actions',
       label: 'Actions',
-      width: 320,
+      width: 220,
       render: (ep) => (
         <View style={styles.actions}>
           <TouchableOpacity
@@ -337,12 +323,14 @@ export default function AdminEpisodes() {
             <Feather name="bar-chart-2" size={14} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.muted }]}
-            onPress={() => handleEdit(ep)}
-          >
-            <Feather name="edit-2" size={14} color="#fff" />
-          </TouchableOpacity>
+          {!ep.ended_at && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.muted }]}
+              onPress={() => handleEdit(ep)}
+            >
+              <Feather name="edit-2" size={14} color="#fff" />
+            </TouchableOpacity>
+          )}
 
           {ep.is_live ? (
             <TouchableOpacity
@@ -351,23 +339,14 @@ export default function AdminEpisodes() {
             >
               <Feather name="stop-circle" size={14} color="#fff" />
             </TouchableOpacity>
-          ) : !ep.ended_at && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.success }]}
-              onPress={() => handleGoLive(ep)}
-            >
-              <Feather name="play-circle" size={14} color="#fff" />
-            </TouchableOpacity>
-          )}
-
-          {!ep.is_live && !ep.ended_at && (
+          ) : !ep.ended_at ? (
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.danger }]}
               onPress={() => handleDelete(ep)}
             >
               <Feather name="trash-2" size={14} color="#fff" />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       ),
     },
@@ -379,7 +358,7 @@ export default function AdminEpisodes() {
         <View>
           <Text style={[styles.title, { color: colors.foreground }]}>Episodes</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            Manage your live cooking episodes
+            Manage your live cooking episodes — they auto-go-live at scheduled time
           </Text>
         </View>
         <TouchableOpacity
@@ -796,6 +775,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   statusText: { fontSize: 11, fontWeight: '700' },
+  scheduleHint: { fontSize: 10, marginTop: 2, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 6 },
   actionBtn: {
     width: 32,

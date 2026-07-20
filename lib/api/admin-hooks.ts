@@ -149,6 +149,40 @@ export function useCloseQuestionAdmin() {
 }
 
 // ============================================================================
+// DISMISS QUESTION
+// ============================================================================
+
+export function useDismissQuestion() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ episodeId, questionId }: { episodeId: string; questionId: string }) =>
+      adminApi.dismissQuestion(episodeId, questionId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: keys.questions(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: keys.activeQuestion(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: keys.leaderboard(data.question?.episode_id) });
+    },
+  });
+}
+
+// ============================================================================
+// AUTO-TRANSITION
+// ============================================================================
+
+export function useAutoTransitionEpisodes() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => adminApi.autoTransitionLiveEpisodes(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.episodes });
+      queryClient.invalidateQueries({ queryKey: keys.liveEpisode });
+    },
+  });
+}
+
+// ============================================================================
 // ANALYTICS
 // ============================================================================
 

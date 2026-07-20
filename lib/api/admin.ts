@@ -209,6 +209,49 @@ export async function closeQuestion(episodeId: string, questionId: string) {
   return data;
 }
 
+// Dismiss a question (calls edge function)
+// Marks the question as dismissed so the admin can activate the next one
+export async function dismissQuestion(episodeId: string, questionId: string) {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase.functions.invoke('dismiss-question', {
+    body: { questionId, episodeId },
+  });
+
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+// Auto-transition episodes from scheduled → live when their time arrives
+// Can be called periodically by the admin dashboard
+export async function autoTransitionLiveEpisodes() {
+  const { data, error } = await supabase
+    .rpc('auto_live_episodes');
+
+  if (error) {
+    console.error('auto_live_episodes RPC failed:', error.message);
+    // Fallback: direct update for admin
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) throw new Error('Not authenticated');
+
+    const { data: directData, error: directError } = await supabase
+      .from('episodes')
+      .update({ is_live: true, status: 'live', ended_at: null })
+      .eq('status', 'scheduled')
+      .eq('is_live', false)
+      .is('ended_at', null)
+      .lte('scheduled_at', new Date().toISOString())
+      .select('*');
+
+    if (directError) throw directError;
+    return directData || [];
+  }
+
+  return data || [];
+}
+
 // ============================================================================
 // ANALYTICS
 // ============================================================================

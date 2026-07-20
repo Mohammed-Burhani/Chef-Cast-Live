@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS questions (
   has_been_activated BOOLEAN DEFAULT FALSE NOT NULL,
   opened_at TIMESTAMPTZ,
   closed_at TIMESTAMPTZ,
+  dismissed_at TIMESTAMPTZ,
   sequence_number INTEGER NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
@@ -520,6 +521,24 @@ BEGIN
   SET rank = ranked.new_rank
   FROM ranked
   WHERE es.id = ranked.id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Auto-live episodes: transitions scheduled episodes to live when their time comes
+CREATE OR REPLACE FUNCTION public.auto_live_episodes()
+RETURNS SETOF episodes AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE episodes SET
+    is_live = true,
+    status = 'live',
+    ended_at = null
+  WHERE
+    status = 'scheduled'
+    AND is_live = false
+    AND ended_at IS NULL
+    AND scheduled_at <= NOW()
+  RETURNING *;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

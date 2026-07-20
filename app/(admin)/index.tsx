@@ -74,7 +74,7 @@ export default function AdminDashboard() {
             activeOpacity={0.8}
           >
             <Feather name="radio" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Go Live</Text>
+            <Text style={styles.actionLabel}>Live Control</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
