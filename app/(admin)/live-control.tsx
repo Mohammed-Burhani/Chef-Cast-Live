@@ -112,36 +112,23 @@ export default function AdminLiveControl() {
     q.has_been_activated && !q.is_active && !q.dismissed_at
   );
 
-  const handleStopLive = (episode: any) => {
-    Alert.alert(
-      'Stop Stream',
-      `End live streaming for "${episode.title}"?\n\nThis will end the episode for all viewers.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Stream',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Deactivate any active question first
-              if (activeQuestion) {
-                await closeMutation.mutateAsync({
-                  episodeId: episode.id,
-                  questionId: activeQuestion.id,
-                });
-              }
-              await toggleLiveMutation.mutateAsync({
-                episodeId: episode.id,
-                isLive: false,
-              });
-              Alert.alert('Success', 'Stream ended');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            }
-          },
-        },
-      ]
-    );
+  const handleStopLive = async (episode: any) => {
+    try {
+      // Deactivate any active question first
+      if (activeQuestion) {
+        await closeMutation.mutateAsync({
+          episodeId: episode.id,
+          questionId: activeQuestion.id,
+        });
+      }
+      await toggleLiveMutation.mutateAsync({
+        episodeId: episode.id,
+        isLive: false,
+      });
+      await refetchActive();
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   const handleActivateQuestion = async (questionId: string) => {
@@ -173,96 +160,47 @@ export default function AdminLiveControl() {
   const handleCloseQuestion = async (questionId: string) => {
     if (!liveEpisode) return;
 
-    Alert.alert(
-      'Close & Score Question',
-      'This will close the question, score all answers, and show the leaderboard to viewers.\n\n' +
-      'After this, you will need to dismiss the question before activating the next one.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Close & Score',
-          style: 'default',
-          onPress: async () => {
-            try {
-              await closeMutation.mutateAsync({
-                episodeId: liveEpisode.id,
-                questionId,
-              });
-              await refetchActive();
-              Alert.alert('Scored', 'Question closed and answers scored. Review the results below, then dismiss when ready for the next question.');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      await closeMutation.mutateAsync({
+        episodeId: liveEpisode.id,
+        questionId,
+      });
+      await refetchActive();
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   const handleDismissQuestion = async (questionId: string) => {
     if (!liveEpisode) return;
 
-    Alert.alert(
-      '⚠️ Dismiss Question',
-      'This will remove the question from the live view permanently.\n\n' +
-      '• Answers have already been scored\n' +
-      '• Leaderboard results have been shown\n' +
-      '• Once dismissed, this question cannot be reactivated\n\n' +
-      'You will then be able to activate the next question.\n\n' +
-      'Are you sure you want to dismiss this question?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Dismiss Question',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await dismissMutation.mutateAsync({
-                episodeId: liveEpisode.id,
-                questionId,
-              });
-              await refetchActive();
-              Alert.alert('Dismissed', 'Question dismissed. You can now activate the next question.');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      await dismissMutation.mutateAsync({
+        episodeId: liveEpisode.id,
+        questionId,
+      });
+      await refetchActive();
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
-  const handleEndStreamWhileResultsShowing = () => {
-    Alert.alert(
-      'End Stream',
-      'There are still unanswered questions or results being shown.\n\n' +
-      'Are you sure you want to end the stream now? Any active question will be closed and all questions will be dismissed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Anyway',
-          style: 'destructive',
-          onPress: async () => {
-            if (!liveEpisode) return;
-            try {
-              if (activeQuestion) {
-                await closeMutation.mutateAsync({
-                  episodeId: liveEpisode.id,
-                  questionId: activeQuestion.id,
-                });
-              }
-              await toggleLiveMutation.mutateAsync({
-                episodeId: liveEpisode.id,
-                isLive: false,
-              });
-              Alert.alert('Success', 'Stream ended');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            }
-          },
-        },
-      ]
-    );
+  const handleEndStreamWhileResultsShowing = async () => {
+    if (!liveEpisode) return;
+    try {
+      if (activeQuestion) {
+        await closeMutation.mutateAsync({
+          episodeId: liveEpisode.id,
+          questionId: activeQuestion.id,
+        });
+      }
+      await toggleLiveMutation.mutateAsync({
+        episodeId: liveEpisode.id,
+        isLive: false,
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   // Helper to classify question state

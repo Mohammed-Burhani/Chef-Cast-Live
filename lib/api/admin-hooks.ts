@@ -43,6 +43,8 @@ export function useToggleEpisodeLive() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.episodes });
       queryClient.invalidateQueries({ queryKey: keys.liveEpisode });
+      // Clear episode cache so home screen immediately reflects ended status
+      queryClient.invalidateQueries({ queryKey: ['episodes'] });
     },
   });
 }

@@ -66,6 +66,8 @@ export function QuizTab({ episodeId }: QuizTabProps) {
   // Track answer submission for current question
   const hasSubmitted = useRef(false);
   const questionStartTime = useRef<number>(0);
+  const autoCloseTriggered = useRef(false);
+  const handleAutoCloseRef = useRef<typeof handleAutoClose>(() => {});
 
   // Pulse animation for idle
   const pulseOpacity = useSharedValue(1);
@@ -90,6 +92,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
     if (phase === 'question' && currentQuestion) {
       questionStartTime.current = Date.now();
       hasSubmitted.current = false;
+      autoCloseTriggered.current = false;
     }
   }, [phase, currentQuestion?.id]);
 
@@ -100,9 +103,10 @@ export function QuizTab({ episodeId }: QuizTabProps) {
         const store = useLiveQuizStore.getState();
         store.tickTimer();
 
-        // When timer hits 0, auto-close
-        if (store.timerRemaining <= 1) {
-          handleAutoClose();
+        // When timer hits 0, auto-close (guard against double-call)
+        if (store.timerRemaining <= 1 && !autoCloseTriggered.current) {
+          autoCloseTriggered.current = true;
+          handleAutoCloseRef.current();
         }
       }, 1000);
       return () => clearInterval(interval);
@@ -129,15 +133,32 @@ export function QuizTab({ episodeId }: QuizTabProps) {
         episodeId,
         questionId: currentQuestion.id,
       });
-      // Use the real correctOption from the edge function response,
-      // not the placeholder 'a' from currentQuestion
-      handleQuestionClosed(result.correctOption ?? currentQuestion.correct_option);
+
+      // If another client/admin already closed this question, the edge function
+      // returns { alreadyClosed: true } without correctOption. In that case,
+      // wait for the realtime QUESTION_CLOSED event which carries the real answer.
+      if (result.alreadyClosed) {
+        return;
+      }
+
+      // Use the real correctOption from the edge function response.
+      // Never fall back to currentQuestion.correct_option — it's always the
+      // placeholder 'a' from the QUESTION_ACTIVATED event (correct answer
+      // is never included in that event for security).
+      if (result.correctOption) {
+        handleQuestionClosed(result.correctOption);
+      }
     } catch (err) {
-      // Question might already be closed — use placeholder if needed;
-      // the realtime QUESTION_CLOSED event will correct it.
-      handleQuestionClosed(currentQuestion.correct_option);
+      // Question might already be closed by another client or admin.
+      // Don't use the placeholder correct_option ('a') — instead, wait for
+      // the realtime QUESTION_CLOSED event which carries the real answer.
+      // The event handler in LiveSessionScreen will call handleQuestionClosed()
+      // with the correct option.
     }
   }, [currentQuestion, episodeId, closeQuestionMutation, handleQuestionClosed]);
+
+  // Keep the ref in sync so the timer interval always calls the latest callback
+  handleAutoCloseRef.current = handleAutoClose;
 
   const handleSelectAnswer = useCallback(async (optionKey: 'a' | 'b' | 'c' | 'd') => {
     if (hasSubmitted.current || !currentQuestion || !episodeId || !user) return;

@@ -23,6 +23,9 @@ class ChannelManager {
   private channels = new Map<string, ChannelMetadata>();
   private eventHandlers = new Map<string, Set<EventHandler>>();
   private connectionStatuses = new Map<string, ConnectionStatus>();
+  // Track questions that have already fired QUESTION_CLOSED in this session
+  // to guard against duplicate events when payload.old lacks column-level data.
+  private closedQuestionIds = new Set<string>();
 
   // Reconnection config
   private readonly INITIAL_DELAY = 1000;
@@ -314,8 +317,11 @@ class ChannelManager {
       });
     }
 
-    // Question closed
-    if (record.closed_at && !payload.old?.closed_at) {
+    // Question closed — guard against false duplicates using a tracked Set
+    // because payload.old may only contain the primary key (default replication mode),
+    // causing every subsequent update to a closed question to fire QUESTION_CLOSED again.
+    if (record.closed_at && !this.closedQuestionIds.has(record.id)) {
+      this.closedQuestionIds.add(record.id);
       this.emit({
         type: 'QUESTION_CLOSED',
         questionId: record.id,

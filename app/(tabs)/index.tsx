@@ -245,11 +245,11 @@ export default function HomeScreen() {
         {/* Live Episode Banner */}
         {liveEpisode && (
           <View style={styles.section}>
-            <View style={[styles.liveBanner, { backgroundColor: `${colors.neonRed}08`, borderColor: `${colors.neonRed}40` }]}>
+            <View style={[styles.liveBanner, { backgroundColor: `${colors.neonRed}15`, borderColor: colors.neonRed }]}>
               <View style={styles.liveBannerHeader}>
                 <LiveBadge />
                 <Text style={[styles.liveBannerTitle, { color: colors.neonRed }]}>
-                  On Air Now
+                  🔴 ON AIR NOW — JOIN LIVE!
                 </Text>
               </View>
               <EpisodeCard episode={liveEpisode} />
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 18, fontWeight: "700" },
   seeAll: { fontSize: 14, fontWeight: "600" },
-  liveBanner: { borderRadius: 20, padding: 16, borderWidth: 1, gap: 14 },
+  liveBanner: { borderRadius: 20, padding: 16, borderWidth: 2, gap: 14 },
   liveBannerHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   liveBannerTitle: { fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },
   liveBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },

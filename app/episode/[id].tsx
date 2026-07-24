@@ -121,7 +121,7 @@ export default function EpisodeDetailScreen() {
         {isLive && (
           <TouchableOpacity
             style={[styles.liveButton, { backgroundColor: colors.neonRed }]}
-            onPress={() => router.push(`/live/${episode.slug || episode.id}` as never)}
+            onPress={() => router.push(`/live/${episode.id}` as never)}
           >
             <Feather name="zap" size={18} color="#fff" />
             <Text style={styles.liveButtonText}>Join Live Session</Text>

@@ -52,10 +52,12 @@ export async function toggleEpisodeLive(id: string, isLive: boolean) {
 
   const updates: any = { is_live: isLive };
   if (isLive) {
-    // When going live, clear any previous ended_at
+    // When going live, clear any previous ended_at and set status
     updates.ended_at = null;
+    updates.status = 'live';
   } else {
     updates.ended_at = new Date().toISOString();
+    updates.status = 'ended';
   }
 
   const { data, error } = await supabase
@@ -172,11 +174,18 @@ export async function toggleQuestionActive(id: string, isActive: boolean) {
 
 // Activate question + deactivate all others in episode (uses edge function)
 export async function activateQuestionExclusive(episodeId: string, questionId: string) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('activate-question', {
     body: { questionId, episodeId },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) throw error;
@@ -197,11 +206,18 @@ export async function deactivateAllQuestions(episodeId: string) {
 
 // Close a question (calls edge function)
 export async function closeQuestion(episodeId: string, questionId: string) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('close-question', {
     body: { questionId, episodeId },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) throw error;
@@ -212,11 +228,18 @@ export async function closeQuestion(episodeId: string, questionId: string) {
 // Dismiss a question (calls edge function)
 // Marks the question as dismissed so the admin can activate the next one
 export async function dismissQuestion(episodeId: string, questionId: string) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('dismiss-question', {
     body: { questionId, episodeId },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) throw error;

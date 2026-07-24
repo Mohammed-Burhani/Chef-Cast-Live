@@ -1,10 +1,14 @@
 /**
  * VideoPlayer Component
  * YouTube live stream player with quiz-aware fullscreen control
+ *
+ * - Auto-plays the stream when mounted
+ * - Exits fullscreen automatically when quiz becomes active
+ * - Blocks fullscreen entry while quiz is active
  */
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useRef, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import YoutubeIframe from 'react-native-youtube-iframe';
 import { useColors } from '@/hooks/useColors';
@@ -38,6 +42,46 @@ function parseYoutubeVideoId(url: string): string | null {
 function VideoPlayerComponent({ streamUrl, isQuizActive }: VideoPlayerProps) {
   const colors = useColors();
   const videoId = streamUrl ? parseYoutubeVideoId(streamUrl) : null;
+  const playerRef = useRef<any>(null);
+  const wasQuizActiveRef = useRef(isQuizActive);
+
+  // Auto-exit fullscreen when quiz becomes active
+  useEffect(() => {
+    if (isQuizActive && !wasQuizActiveRef.current) {
+      // Quiz just became active — try to exit fullscreen
+      try {
+        // Web: use the Fullscreen API
+        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+
+        // Native: Try to access the WebView and inject fullscreen exit
+        if (Platform.OS !== 'web') {
+          const iframeRef = playerRef.current?.ref?.current
+            ?? playerRef.current?.webViewRef?.current;
+          if (iframeRef?.injectJavaScript) {
+            iframeRef.injectJavaScript(
+              `try { document.exitFullscreen(); } catch(e) {} true;`
+            );
+          }
+        }
+      } catch {
+        // Best effort — don't crash if fullscreen exit fails
+      }
+    }
+    wasQuizActiveRef.current = isQuizActive;
+  }, [isQuizActive]);
+
+  const handleReady = useCallback(() => {
+    // Player is ready — force play in case the play={true} prop doesn't auto-start
+    try {
+      playerRef.current?.playVideo?.();
+    } catch {
+      // Best effort — some platforms don't support programmatic play
+    }
+  }, []);
 
   if (!videoId) {
     return (
@@ -52,10 +96,13 @@ function VideoPlayerComponent({ streamUrl, isQuizActive }: VideoPlayerProps) {
   return (
     <View style={styles.container}>
       <YoutubeIframe
+        key={videoId}
+        ref={playerRef}
         videoId={videoId}
         height={300}
-        play={false}
+        play={true}
         allowWebViewZoom={false}
+        onReady={handleReady}
         webViewProps={{
           allowsFullscreenVideo: !isQuizActive,
         }}

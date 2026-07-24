@@ -30,7 +30,8 @@ export async function fetchLiveEpisode() {
   const { data, error } = await supabase
     .from('episodes')
     .select('*')
-    .eq('status', 'live')
+    .eq('is_live', true)
+    .is('ended_at', null)
     .single();
 
   if (error) {

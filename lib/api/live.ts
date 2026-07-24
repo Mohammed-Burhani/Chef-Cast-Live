@@ -154,11 +154,18 @@ export async function fetchUserAnswer(episodeId: string, questionId: string) {
  * Calls the activate-question edge function
  */
 export async function activateQuestion(episodeId: string, questionId: string) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('activate-question', {
     body: { questionId, episodeId },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) throw error;
@@ -171,11 +178,18 @@ export async function activateQuestion(episodeId: string, questionId: string) {
  * Calls the close-question edge function
  */
 export async function closeQuestion(episodeId: string, questionId: string) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('close-question', {
     body: { questionId, episodeId },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) throw error;
@@ -189,11 +203,18 @@ export async function closeQuestion(episodeId: string, questionId: string) {
  * Calls the dismiss-question edge function.
  */
 export async function dismissQuestion(episodeId: string, questionId: string) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('dismiss-question', {
     body: { questionId, episodeId },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) throw error;
@@ -210,8 +231,12 @@ export async function submitAnswerLive(params: {
   selectedOption: 'a' | 'b' | 'c' | 'd';
   responseTimeMs: number;
 }) {
-  const { data: session } = await supabase.auth.getSession();
-  if (!session.session) throw new Error('Not authenticated');
+  // Force a token refresh — getSession() returns cached tokens which may be expired
+  const { error: refreshError } = await supabase.auth.getUser();
+  if (refreshError) throw new Error('Session expired. Please log in again.');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
 
   const { data, error } = await supabase.functions.invoke('score-answer', {
     body: {
@@ -219,6 +244,9 @@ export async function submitAnswerLive(params: {
       episodeId: params.episodeId,
       selectedOption: params.selectedOption,
       responseTimeMs: params.responseTimeMs,
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
     },
   });
 
@@ -290,6 +318,7 @@ export function useEpisodeQuestions(episodeId: string) {
     queryKey: liveKeys.questions(episodeId),
     queryFn: () => fetchEpisodeQuestions(episodeId),
     enabled: !!episodeId,
+    refetchInterval: false, // Don't poll - rely on realtime
     ...queryConfig,
   });
 }
@@ -302,7 +331,7 @@ export function useActiveQuestion(episodeId: string) {
     queryKey: liveKeys.activeQuestion(episodeId),
     queryFn: () => fetchActiveQuestion(episodeId),
     enabled: !!episodeId,
-    refetchInterval: 5000, // Poll while live
+    refetchInterval: false, // Don't poll - rely on realtime
     ...queryConfig,
   });
 }
@@ -315,7 +344,7 @@ export function useLiveLeaderboard(episodeId: string) {
     queryKey: liveKeys.leaderboard(episodeId),
     queryFn: () => fetchLiveLeaderboard(episodeId),
     enabled: !!episodeId,
-    refetchInterval: 10000, // Poll every 10s
+    refetchInterval: false, // Don't poll - rely on realtime
     ...queryConfig,
   });
 }
@@ -360,6 +389,7 @@ export function useCloseQuestion() {
       closeQuestion(episodeId, questionId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: liveKeys.activeQuestion(data.question?.episode_id) });
+      queryClient.invalidateQueries({ queryKey: liveKeys.questions(data.question?.episode_id) });
       queryClient.invalidateQueries({ queryKey: liveKeys.leaderboard(data.question?.episode_id) });
     },
   });

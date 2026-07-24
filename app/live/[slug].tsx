@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { VideoPlayer } from "@/components/live/VideoPlayer";
 import { TabBar } from "@/components/live/TabBar";
@@ -24,7 +25,7 @@ import { QuizTab } from "@/components/live/QuizTab";
 import { CommentsTab } from "@/components/live/CommentsTab";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { useColors } from "@/hooks/useColors";
-import { useLiveSession, useJoinLiveSession } from "@/lib/api/live";
+import { useLiveSession, useJoinLiveSession, fetchActiveQuestion } from "@/lib/api/live";
 import { useLiveQuizStore } from "@/store/useLiveQuizStore";
 import { useRealtimeStore } from "@/store/realtimeStore";
 import { useEpisodeChannel, useQuestionEvents, useLeaderboardEvents } from "@/lib/realtime/hooks";
@@ -40,6 +41,14 @@ export default function LiveSessionScreen() {
   const { data: session, isLoading, error } = useLiveSession(episodeId);
   const joinMutation = useJoinLiveSession();
 
+  // Poll for active question as Realtime fallback (polls every 5s)
+  const { data: polledActive } = useQuery({
+    queryKey: ['poll-active', episodeId],
+    queryFn: () => fetchActiveQuestion(episodeId),
+    enabled: !!episodeId,
+    refetchInterval: 5000,
+  });
+
   // Auth
   const user = useAuthStore((s) => s.user);
 
@@ -53,11 +62,8 @@ export default function LiveSessionScreen() {
   const handleQuestionClosed = useLiveQuizStore((s) => s.handleQuestionClosed);
   const updateLeaderboard = useLiveQuizStore((s) => s.updateLeaderboard);
   const updateScore = useLiveQuizStore((s) => s.updateScore);
-  const setTotalQuestions = useLiveQuizStore((s) => s.setTotalQuestions);
   const reset = useLiveQuizStore((s) => s.reset);
   const phase = useLiveQuizStore((s) => s.phase);
-  const totalQuestions = useLiveQuizStore((s) => s.totalQuestions);
-  const currentQuestionNumber = useLiveQuizStore((s) => s.currentQuestionNumber);
 
   // Connect to the episode channel on mount
   useEpisodeChannel(episodeId);
@@ -83,13 +89,11 @@ export default function LiveSessionScreen() {
         created_at: '',
       };
 
-      // If this is the first question, start quiz
-      if (currentQuestionNumber === 0) {
-        setTotalQuestions(totalQuestions || 0);
-      }
+      // totalQuestions is set by the session-loading useEffect below.
+      // No need to set it here — session data loads before admin typically activates.
 
       handleQuestionActivated(question);
-    }, [episodeId, handleQuestionActivated, currentQuestionNumber, totalQuestions, setTotalQuestions]),
+    }, [episodeId, handleQuestionActivated]),
 
     onClosed: useCallback((event) => {
       handleQuestionClosed(event.correctOption);
@@ -124,7 +128,7 @@ export default function LiveSessionScreen() {
     // We also poll via React Query as fallback
   }, [episodeId]);
 
-  // Join session on mount
+  // Join session on mount + hydrate from existing active question
   useEffect(() => {
     if (episodeId && user?.id) {
       setEpisodeId(episodeId);
@@ -133,13 +137,43 @@ export default function LiveSessionScreen() {
       // Set total questions from session data
       if (session?.questions) {
         useLiveQuizStore.getState().setTotalQuestions(session.questions.length);
+
+        // Hydrate: check if a question is already active (user joined late / reloaded)
+        const activeQuestion = session.questions.find(q => q.is_active);
+        const currentPhase = useLiveQuizStore.getState().phase;
+        if (activeQuestion && currentPhase === 'idle') {
+          const question = {
+            id: activeQuestion.id,
+            episode_id: episodeId,
+            question_text: activeQuestion.question_text,
+            option_a: activeQuestion.option_a,
+            option_b: activeQuestion.option_b,
+            option_c: activeQuestion.option_c,
+            option_d: activeQuestion.option_d,
+            correct_option: 'a', // hidden until revealed
+            timer_seconds: activeQuestion.timer_seconds,
+            is_active: true,
+            has_been_activated: true,
+            opened_at: activeQuestion.opened_at,
+            closed_at: null,
+            sequence_number: activeQuestion.sequence_number,
+            created_at: activeQuestion.created_at,
+          };
+          useLiveQuizStore.getState().handleQuestionActivated(question);
+
+          // Also check if the active question was already closed
+          // (realtime QUESTION_CLOSED may have been missed during loading)
+          if (activeQuestion.closed_at) {
+            useLiveQuizStore.getState().handleQuestionClosed(activeQuestion.correct_option);
+          }
+        }
       }
     }
 
     return () => {
       reset();
     };
-  }, [episodeId, user?.id]);
+  }, [episodeId, user?.id, session?.questions]);
 
   // Update total questions when session loads
   useEffect(() => {
@@ -147,6 +181,37 @@ export default function LiveSessionScreen() {
       useLiveQuizStore.getState().setTotalQuestions(session.questions.length);
     }
   }, [session?.questions]);
+
+  // Polling fallback: when a polled active question is found and store is idle, hydrate
+  useEffect(() => {
+    if (!polledActive) return;
+    const currentPhase = useLiveQuizStore.getState().phase;
+    if (currentPhase !== 'idle') return;
+
+    const question = {
+      id: polledActive.id,
+      episode_id: episodeId,
+      question_text: polledActive.question_text,
+      option_a: polledActive.option_a,
+      option_b: polledActive.option_b,
+      option_c: polledActive.option_c,
+      option_d: polledActive.option_d,
+      correct_option: 'a',
+      timer_seconds: polledActive.timer_seconds,
+      is_active: true,
+      has_been_activated: true,
+      opened_at: polledActive.opened_at,
+      closed_at: null,
+      sequence_number: polledActive.sequence_number,
+      created_at: polledActive.created_at,
+    };
+    useLiveQuizStore.getState().handleQuestionActivated(question);
+
+    // If already closed, transition immediately
+    if (polledActive.closed_at) {
+      useLiveQuizStore.getState().handleQuestionClosed(polledActive.correct_option);
+    }
+  }, [polledActive?.id, episodeId]);
 
   // Connection status polling
   useEffect(() => {

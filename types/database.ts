@@ -149,6 +149,7 @@ export interface Database {
           has_been_activated: boolean
           opened_at: string | null
           closed_at: string | null
+          dismissed_at: string | null
           sequence_number: number
           created_at: string
         }
@@ -166,6 +167,7 @@ export interface Database {
           has_been_activated?: boolean
           opened_at?: string | null
           closed_at?: string | null
+          dismissed_at?: string | null
           sequence_number: number
           created_at?: string
         }
@@ -183,6 +185,7 @@ export interface Database {
           has_been_activated?: boolean
           opened_at?: string | null
           closed_at?: string | null
+          dismissed_at?: string | null
           sequence_number?: number
           created_at?: string
         }

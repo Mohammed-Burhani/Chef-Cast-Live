@@ -37,6 +37,16 @@ interface Question {
   is_active: boolean;
 }
 
+function decodeJwt(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    return JSON.parse(atob(parts[1]));
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -44,29 +54,32 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client with user context
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
-
-    // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
+    // Extract and decode JWT — gateway already verified the signature
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const token = authHeader.substring(7);
+    const payload = decodeJwt(token);
+    const userId = payload?.sub as string | undefined;
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Service-role client for DB operations (bypasses RLS so answer
+    // submissions work without per-user auth checks)
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
 
     // Parse request body
     const body: RequestBody = await req.json();
@@ -137,7 +150,7 @@ serve(async (req) => {
     const { error: answerError } = await supabaseClient
       .from('answers')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         question_id: questionId,
         episode_id: episodeId,
         selected_option: selectedOption,
@@ -156,7 +169,7 @@ serve(async (req) => {
         const { data: existingScore } = await supabaseClient
           .from('episode_scores')
           .select('total_score, correct_count')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('episode_id', episodeId)
           .single();
 
@@ -182,7 +195,7 @@ serve(async (req) => {
     const { data: updatedScore, error: fetchError } = await supabaseClient
       .from('episode_scores')
       .select('total_score, correct_count')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('episode_id', episodeId)
       .single();
 
