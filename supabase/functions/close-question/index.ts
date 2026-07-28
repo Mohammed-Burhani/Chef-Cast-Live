@@ -6,6 +6,7 @@
  * - Scores all unscored answers for the current question
  * - Updates episode_scores for all participants
  * - Recalculates ranks
+ * - Inserts quiz_events row for race-condition-free delivery
  * - Idempotent: safe to call multiple times
  *
  * POST /functions/v1/close-question
@@ -56,8 +57,7 @@ serve(async (req) => {
       });
     }
 
-    // Service-role client for DB operations (bypasses RLS so both
-    // admin close and user auto-close work without admin-level permissions)
+    // Service-role client for DB operations (bypasses RLS)
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -127,8 +127,6 @@ serve(async (req) => {
     const timerSeconds = question.timer_seconds;
 
     // Fetch all answers for this question that may need scoring
-    // (The trigger on_answer_inserted should have handled scoring,
-    //  but we ensure all are correctly scored here)
     const { data: answers, error: answersError } = await supabase
       .from('answers')
       .select('*')
@@ -160,6 +158,23 @@ serve(async (req) => {
             .eq('id', scores[i].id);
         }
       }
+    }
+
+    // Insert quiz_events row for race-condition-free delivery
+    const { error: eventError } = await supabase
+      .from('quiz_events')
+      .insert({
+        episode_id: episodeId,
+        event_type: 'QUESTION_CLOSED',
+        payload: {
+          questionId: closedQuestion.id,
+          correctOption: correctOption,
+          closedAt: now,
+        },
+      });
+
+    if (eventError) {
+      console.error('Failed to insert quiz_events row:', eventError.message);
     }
 
     // Fetch final leaderboard

@@ -28,7 +28,7 @@ import { useColors } from "@/hooks/useColors";
 import { useLiveSession, useJoinLiveSession, fetchActiveQuestion } from "@/lib/api/live";
 import { useLiveQuizStore } from "@/store/useLiveQuizStore";
 import { useRealtimeStore } from "@/store/realtimeStore";
-import { useEpisodeChannel, useQuestionEvents, useLeaderboardEvents } from "@/lib/realtime/hooks";
+import { useEpisodeChannel, useQuestionEvents, useLeaderboardEvents, useQuestionDismissedEvent } from "@/lib/realtime/hooks";
 import { useAuthStore } from "@/store/authStore";
 
 export default function LiveSessionScreen() {
@@ -41,12 +41,12 @@ export default function LiveSessionScreen() {
   const { data: session, isLoading, error } = useLiveSession(episodeId);
   const joinMutation = useJoinLiveSession();
 
-  // Poll for active question as Realtime fallback (polls every 5s)
+  // Poll for active question as Realtime fallback (polls every 2s)
   const { data: polledActive } = useQuery({
     queryKey: ['poll-active', episodeId],
     queryFn: () => fetchActiveQuestion(episodeId),
     enabled: !!episodeId,
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   // Auth
@@ -96,9 +96,14 @@ export default function LiveSessionScreen() {
     }, [episodeId, handleQuestionActivated]),
 
     onClosed: useCallback((event) => {
-      handleQuestionClosed(event.correctOption);
+      handleQuestionClosed(event.correctOption, event.questionId);
     }, [handleQuestionClosed]),
   });
+
+  // Handle question dismissed — transitions from revealing → between/complete
+  useQuestionDismissedEvent(episodeId, useCallback(() => {
+    useLiveQuizStore.getState().handleQuestionDismissed();
+  }, []));
 
   // Handle realtime leaderboard updates
   useLeaderboardEvents(episodeId, useCallback((event) => {
@@ -164,7 +169,7 @@ export default function LiveSessionScreen() {
           // Also check if the active question was already closed
           // (realtime QUESTION_CLOSED may have been missed during loading)
           if (activeQuestion.closed_at) {
-            useLiveQuizStore.getState().handleQuestionClosed(activeQuestion.correct_option);
+            useLiveQuizStore.getState().handleQuestionClosed(activeQuestion.correct_option, activeQuestion.id);
           }
         }
       }
@@ -182,11 +187,16 @@ export default function LiveSessionScreen() {
     }
   }, [session?.questions]);
 
-  // Polling fallback: when a polled active question is found and store is idle, hydrate
+  // Polling fallback: when a polled active question is found and store is idle/between, hydrate
   useEffect(() => {
     if (!polledActive) return;
     const currentPhase = useLiveQuizStore.getState().phase;
-    if (currentPhase !== 'idle') return;
+    // Allow hydration from idle or between phases (next question started)
+    // Also hydrate if the polled question differs from current (new question)
+    const currentQ = useLiveQuizStore.getState().currentQuestion;
+    const isSameQuestion = currentQ?.id === polledActive.id;
+    if (isSameQuestion) return; // Already tracking this question
+    if (currentPhase !== 'idle' && currentPhase !== 'between') return;
 
     const question = {
       id: polledActive.id,
@@ -209,7 +219,7 @@ export default function LiveSessionScreen() {
 
     // If already closed, transition immediately
     if (polledActive.closed_at) {
-      useLiveQuizStore.getState().handleQuestionClosed(polledActive.correct_option);
+      useLiveQuizStore.getState().handleQuestionClosed(polledActive.correct_option, polledActive.id);
     }
   }, [polledActive?.id, episodeId]);
 

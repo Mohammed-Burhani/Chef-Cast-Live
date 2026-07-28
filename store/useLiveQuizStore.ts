@@ -71,7 +71,8 @@ interface LiveQuizState {
   handleQuestionActivated: (question: Question) => void;
   setSelectedOption: (option: string) => void;
   submitAnswer: (answer: UserAnswer) => void;
-  handleQuestionClosed: (correctOption: string) => void;
+  handleQuestionClosed: (correctOption: string, questionId?: string) => void;
+  handleQuestionDismissed: () => void;
   showBetweenLeaderboard: () => void;
   startNextQuestion: (question: Question) => void;
   tickTimer: () => void;
@@ -133,10 +134,23 @@ export const useLiveQuizStore = create<LiveQuizState>()((set, get) => ({
     }));
   },
 
-  handleQuestionClosed: (correctOption: string) => {
-    // Reveal the correct answer and transition to revealing phase.
-    // Score/correctCount come from server via updateScore (leaderboard event).
+  handleQuestionClosed: (correctOption: string, questionId?: string) => {
+    // FIX: Only transition to revealing if the closed question matches the
+    // currently active question. This prevents a race condition where the
+    // activate-question edge function's deactivation step (which sets
+    // is_active=false on the OLD question) triggers a QUESTION_CLOSED event
+    // that would immediately hide the newly activated question.
     const currentQuestion = get().currentQuestion;
+
+    // If a questionId is provided, verify it matches the current question
+    if (questionId && currentQuestion && questionId !== currentQuestion.id) {
+      // This QUESTION_CLOSED event is for a different question (likely the old
+      // one being deactivated during activation of a new question). Ignore it.
+      return;
+    }
+
+    // If we have a currentQuestion but no questionId specified,
+    // use the event anyway (backward compatibility with legacy events)
     if (currentQuestion) {
       set({
         phase: 'revealing',
@@ -144,6 +158,15 @@ export const useLiveQuizStore = create<LiveQuizState>()((set, get) => ({
       });
     } else {
       set({ phase: 'revealing' });
+    }
+  },
+
+  handleQuestionDismissed: () => {
+    const { currentQuestionNumber, totalQuestions } = get();
+    if (currentQuestionNumber >= totalQuestions) {
+      set({ phase: 'complete' });
+    } else {
+      set({ phase: 'between' });
     }
   },
 

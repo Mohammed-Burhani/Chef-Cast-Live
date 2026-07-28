@@ -10,12 +10,14 @@ import type {
   ConnectionStatus,
   QuestionActivatedEvent,
   QuestionClosedEvent,
+  QuestionDismissedEvent,
   LeaderboardUpdatedEvent,
   EpisodeWentLiveEvent,
   EpisodeEndedEvent,
   BadgeAwardedEvent,
   XpUpdatedEvent,
   NewDishPhotoEvent,
+  CommentEvent,
 } from './types';
 
 /**
@@ -93,6 +95,32 @@ export function useQuestionEvents(
     return () => {
       unsubscribers.forEach((unsub) => unsub());
     };
+  }, [episodeId]);
+}
+
+/**
+ * Subscribe to question dismissed events
+ */
+export function useQuestionDismissedEvent(
+  episodeId: string | null,
+  handler: (event: QuestionDismissedEvent) => void
+): void {
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
+
+  useEffect(() => {
+    if (!episodeId) return;
+
+    const unsub = channelManager.on('QUESTION_DISMISSED', (event) => {
+      if (event.episodeId === episodeId && handlerRef.current) {
+        handlerRef.current(event);
+      }
+    });
+
+    return unsub;
   }, [episodeId]);
 }
 
@@ -245,6 +273,41 @@ export function useCommunityFeedEvents(
     return () => {
       unsub();
       // Note: Don't unsubscribe channel here as multiple components may use it
+    };
+  }, [episodeId]);
+}
+
+/**
+ * Subscribe to live comments for an episode
+ * Uses Broadcast for low-latency real-time delivery
+ */
+export function useCommentEvents(
+  episodeId: string | null,
+  handler: (event: CommentEvent) => void
+): void {
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
+
+  useEffect(() => {
+    if (!episodeId) return;
+
+    // Subscribe to comments channel
+    channelManager.subscribeToComments(episodeId);
+
+    // Listen for new comment events
+    const unsub = channelManager.on('NEW_COMMENT', (event) => {
+      if (event.episodeId === episodeId && handlerRef.current) {
+        handlerRef.current(event);
+      }
+    });
+
+    return () => {
+      unsub();
+      // Don't unsubscribe the channel here — the comment store manages
+      // channel lifecycle tied to the component mount/unmount
     };
   }, [episodeId]);
 }

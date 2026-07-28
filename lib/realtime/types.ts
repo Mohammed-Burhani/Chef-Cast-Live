@@ -97,13 +97,33 @@ export type ConnectionFailedEvent = {
   reason: string;
 };
 
+export type QuestionDismissedEvent = {
+  type: 'QUESTION_DISMISSED';
+  questionId: string;
+  episodeId: string;
+  dismissedAt: string;
+};
+
+export type CommentEvent = {
+  type: 'NEW_COMMENT';
+  commentId: string;
+  episodeId: string;
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  text: string;
+  createdAt: string;
+};
+
 export type RealtimeEvent =
   | QuestionActivatedEvent
   | QuestionClosedEvent
+  | QuestionDismissedEvent
   | LeaderboardUpdatedEvent
   | EpisodeWentLiveEvent
   | EpisodeEndedEvent
   | NewDishPhotoEvent
   | BadgeAwardedEvent
   | XpUpdatedEvent
-  | ConnectionFailedEvent;
+  | ConnectionFailedEvent
+  | CommentEvent;

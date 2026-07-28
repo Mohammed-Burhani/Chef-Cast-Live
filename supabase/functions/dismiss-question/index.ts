@@ -141,6 +141,22 @@ serve(async (req) => {
 
     if (dismissError) throw dismissError;
 
+    // Insert quiz_events row for race-condition-free delivery
+    const { error: eventError } = await supabase
+      .from('quiz_events')
+      .insert({
+        episode_id: episodeId,
+        event_type: 'QUESTION_DISMISSED',
+        payload: {
+          questionId: dismissedQuestion.id,
+          dismissedAt: now,
+        },
+      });
+
+    if (eventError) {
+      console.error('Failed to insert quiz_events row:', eventError.message);
+    }
+
     // Recalculate ranks for this episode
     const { error: rankError } = await supabase.rpc('recalculate_episode_ranks', {
       p_episode_id: episodeId,

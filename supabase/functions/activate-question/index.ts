@@ -2,9 +2,18 @@
  * Edge Function: activate-question
  * Exclusively activates a question for a live episode.
  *
+ * IMPROVED: No longer sets `closed_at` on the old question during deactivation.
+ * The old question's `closed_at` was already set when `close-question` ran.
+ * Setting it again here triggers a false `postgres_changes` event that gets
+ * interpreted as QUESTION_CLOSED on the client, causing a race condition where
+ * the newly activated question is immediately hidden.
+ *
+ * Also inserts a `quiz_events` row for reliable broadcast-style delivery
+ * (belt-and-suspenders alongside the Realtime postgres_changes mechanism).
+ *
  * - Validates admin role
  * - Checks question hasn't been activated before
- * - Deactivates any currently active question in the episode
+ * - Deactivates any currently active question in the episode (without touching closed_at)
  * - Activates the target question
  * - Sets has_been_activated = true, is_active = true, opened_at = now()
  *
@@ -114,13 +123,17 @@ serve(async (req) => {
       });
     }
 
-    // Use a transaction-like approach: deactivate all, then activate target
-    // First, deactivate any currently active question
+    // FIX: Deactivate any currently active question WITHOUT setting closed_at.
+    // The old question's closed_at was already set when close-question ran.
+    // Setting it again here would trigger a false postgres_changes event
+    // that gets interpreted as QUESTION_CLOSED on the client.
     const { error: deactivateError } = await supabase
       .from('questions')
       .update({
         is_active: false,
-        closed_at: new Date().toISOString(),
+        // NOTE: closed_at intentionally NOT set here.
+        // It was already set by close-question edge function.
+        // Setting it again would fire a spurious QUESTION_CLOSED event.
       })
       .eq('episode_id', episodeId)
       .eq('is_active', true);
@@ -146,6 +159,33 @@ serve(async (req) => {
 
     if (activateError) {
       throw activateError;
+    }
+
+    // FIX: Insert a quiz_events row for reliable broadcast-style delivery.
+    // This is read by the client's postgres_changes subscription on the
+    // quiz_events table, providing a race-condition-free delivery path.
+    const { error: eventError } = await supabase
+      .from('quiz_events')
+      .insert({
+        episode_id: episodeId,
+        event_type: 'QUESTION_ACTIVATED',
+        payload: {
+          questionId: activatedQuestion.id,
+          questionText: activatedQuestion.question_text,
+          optionA: activatedQuestion.option_a,
+          optionB: activatedQuestion.option_b,
+          optionC: activatedQuestion.option_c,
+          optionD: activatedQuestion.option_d,
+          timerSeconds: activatedQuestion.timer_seconds,
+          openedAt: activatedQuestion.opened_at,
+          sequenceNumber: activatedQuestion.sequence_number,
+        },
+      });
+
+    if (eventError) {
+      // Log but don't fail — the postgres_changes on the questions table
+      // will still deliver the activation event (belt and suspenders).
+      console.error('Failed to insert quiz_events row:', eventError.message);
     }
 
     return new Response(

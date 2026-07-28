@@ -1,6 +1,18 @@
 /**
  * Realtime Channel Manager
  * Singleton managing all Supabase Realtime subscriptions with reconnection logic
+ *
+ * IMPROVED: Uses quiz_events table for race-condition-free question delivery.
+ * The old mechanism (postgres_changes on questions table with UPDATE detection)
+ * was fragile because:
+ *   1. REPLICA IDENTITY DEFAULT meant payload.old only had PK columns
+ *   2. The activate-question edge function deactivates the old question (setting
+ *      closed_at), which triggered a false QUESTION_CLOSED event that could
+ *      race with the new question's QUESTION_ACTIVATED event
+ *   3. The new quiz_events table uses INSERT events which are always unique
+ *      and carry the correct event type and payload
+ *
+ * Legacy postgres_changes on questions is kept as a fallback.
  */
 
 import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
@@ -26,6 +38,13 @@ class ChannelManager {
   // Track questions that have already fired QUESTION_CLOSED in this session
   // to guard against duplicate events when payload.old lacks column-level data.
   private closedQuestionIds = new Set<string>();
+  // Track the currently active question per episode so we don't emit
+  // QUESTION_CLOSED for old questions being deactivated.
+  private activeQuestionByEpisode = new Map<string, string>();
+  // Deduplication: prevent both legacy (postgres_changes on questions) and new
+  // (postgres_changes on quiz_events) paths from emitting the same event twice.
+  private processedActivationKeys = new Set<string>();
+  private processedCloseKeys = new Set<string>();
 
   // Reconnection config
   private readonly INITIAL_DELAY = 1000;
@@ -49,6 +68,7 @@ class ChannelManager {
 
     const channel = supabase
       .channel(channelName)
+      // ---- Legacy: postgres_changes on questions table (kept as fallback) ----
       .on(
         'postgres_changes',
         {
@@ -61,6 +81,20 @@ class ChannelManager {
           this.handleQuestionChange(payload, episodeId);
         }
       )
+      // ---- NEW: postgres_changes on quiz_events table (race-condition-free) ----
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'quiz_events',
+          filter: `episode_id=eq.${episodeId}`,
+        },
+        (payload) => {
+          this.handleQuizEvent(payload, episodeId);
+        }
+      )
+      // ---- Legacy: postgres_changes on episode_scores ----
       .on(
         'postgres_changes',
         {
@@ -73,6 +107,7 @@ class ChannelManager {
           this.handleLeaderboardChange(payload, episodeId, userId);
         }
       )
+      // ---- Legacy: postgres_changes on episodes ----
       .on(
         'postgres_changes',
         {
@@ -85,6 +120,7 @@ class ChannelManager {
           this.handleEpisodeChange(payload, episodeId);
         }
       )
+      // ---- Broadcast events (for direct messaging from edge functions) ----
       .on('broadcast', { event: `badge:${userId}` }, (payload) => {
         this.emit({
           type: 'BADGE_AWARDED',
@@ -152,10 +188,74 @@ class ChannelManager {
   }
 
   /**
+   * Subscribe to live comments for an episode
+   *
+   * Uses Supabase Realtime Broadcast for sub-millisecond delivery.
+   * Broadcast messages bypass the database entirely, which means:
+   *   - No WAL bloat from high comment volume
+   *   - No database connection pool exhaustion
+   *   - Sub-millisecond latency (direct WebSocket push)
+   *   - Supabase can handle millions of broadcast messages
+   *
+   * The actual DB write happens in the post-comment edge function,
+   * which also triggers the broadcast. Clients only receive broadcasts.
+   */
+  subscribeToComments(episodeId: string): RealtimeChannel {
+    const channelName = `comments:${episodeId}`;
+
+    // Return existing channel if already subscribed
+    const existing = this.channels.get(channelName);
+    if (existing) {
+      return existing.channel;
+    }
+
+    this.setConnectionStatus(channelName, 'connecting');
+
+    const channel = supabase
+      .channel(channelName)
+      .on('broadcast', { event: 'new_comment' }, (payload) => {
+        const data = payload.payload as {
+          commentId: string;
+          episodeId: string;
+          userId: string;
+          username: string;
+          avatarUrl: string | null;
+          text: string;
+          createdAt: string;
+        };
+
+        this.emit({
+          type: 'NEW_COMMENT',
+          ...data,
+        });
+      })
+      .subscribe((status) => {
+        this.handleSubscriptionStatus(channelName, status);
+      });
+
+    this.channels.set(channelName, {
+      channel,
+      episodeId,
+      reconnectAttempts: 0,
+    });
+
+    return channel;
+  }
+
+  /**
+   * Unsubscribe from comments channel
+   */
+  unsubscribeFromComments(episodeId: string): void {
+    const channelName = `comments:${episodeId}`;
+    this.removeChannel(channelName);
+  }
+
+  /**
    * Unsubscribe from episode channel
    */
   unsubscribeFromEpisode(episodeId: string): void {
     const channelName = `episode:${episodeId}`;
+    this.activeQuestionByEpisode.delete(episodeId);
     this.removeChannel(channelName);
   }
 
@@ -166,6 +266,7 @@ class ChannelManager {
     for (const channelName of this.channels.keys()) {
       this.removeChannel(channelName);
     }
+    this.activeQuestionByEpisode.clear();
   }
 
   /**
@@ -290,6 +391,9 @@ class ChannelManager {
     } else if (channelName.startsWith('feed:')) {
       const feedEpisodeId = channelName.replace('feed:', '');
       this.subscribeToCommunityFeed(feedEpisodeId === 'global' ? null : feedEpisodeId);
+    } else if (channelName.startsWith('comments:')) {
+      const commentsEpisodeId = channelName.replace('comments:', '');
+      this.subscribeToComments(commentsEpisodeId);
     }
   }
 
@@ -297,11 +401,114 @@ class ChannelManager {
   // EVENT HANDLERS
   // ============================================================================
 
+  /**
+   * Handle postgres_changes events on quiz_events table (NEW — preferred path)
+   *
+   * This is the preferred delivery mechanism because INSERT events don't have
+   * the race conditions inherent in UPDATE-based postgres_changes detection.
+   */
+  private handleQuizEvent(payload: any, episodeId: string): void {
+    const record = payload.new;
+    const eventType = record.event_type as string;
+    const eventPayload = record.payload || {};
+
+    switch (eventType) {
+      case 'QUESTION_ACTIVATED': {
+        // Deduplication: quiz_events path may race with legacy questions path.
+        const actKey = `act:${episodeId}:${eventPayload.questionId}`;
+        if (this.processedActivationKeys.has(actKey)) return;
+        this.processedActivationKeys.add(actKey);
+
+        // Track this as the active question for the episode
+        this.activeQuestionByEpisode.set(episodeId, eventPayload.questionId);
+
+        this.emit({
+          type: 'QUESTION_ACTIVATED',
+          questionId: eventPayload.questionId,
+          episodeId,
+          questionText: eventPayload.questionText,
+          optionA: eventPayload.optionA,
+          optionB: eventPayload.optionB,
+          optionC: eventPayload.optionC ?? null,
+          optionD: eventPayload.optionD ?? null,
+          timerSeconds: eventPayload.timerSeconds,
+          openedAt: eventPayload.openedAt,
+          sequenceNumber: eventPayload.sequenceNumber,
+        });
+        break;
+      }
+
+      case 'QUESTION_CLOSED': {
+        // Deduplication: quiz_events path may race with legacy questions path.
+        const closeKey = `close:${episodeId}:${eventPayload.questionId}`;
+        if (this.processedCloseKeys.has(closeKey)) return;
+        this.processedCloseKeys.add(closeKey);
+
+        // Only emit QUESTION_CLOSED if this question is the one we
+        // consider active. This prevents old-question deactivation events
+        // from overriding the current question state.
+        const activeId = this.activeQuestionByEpisode.get(episodeId);
+        if (eventPayload.questionId && activeId && eventPayload.questionId !== activeId) {
+          // This is a close event for a different question — ignore it
+          return;
+        }
+
+        this.closedQuestionIds.add(eventPayload.questionId);
+        this.activeQuestionByEpisode.delete(episodeId);
+
+        this.emit({
+          type: 'QUESTION_CLOSED',
+          questionId: eventPayload.questionId,
+          episodeId,
+          correctOption: eventPayload.correctOption,
+          closedAt: eventPayload.closedAt,
+        });
+        break;
+      }
+
+      case 'QUESTION_DISMISSED': {
+        // Question dismissed — clear tracking and emit event
+        this.closedQuestionIds.delete(eventPayload.questionId);
+
+        this.emit({
+          type: 'QUESTION_DISMISSED',
+          questionId: eventPayload.questionId,
+          episodeId,
+          dismissedAt: eventPayload.dismissedAt,
+        });
+        break;
+      }
+    }
+  }
+
+  /**
+   * Handle postgres_changes events on questions table (LEGACY — kept as fallback)
+   *
+   * This is the original delivery mechanism. It's fragile because:
+   * - payload.old may not contain is_active (REPLICA IDENTITY DEFAULT)
+   * - The deactivation step in activate-question sets closed_at on the OLD
+   *   question, which triggers a false QUESTION_CLOSED event
+   */
   private handleQuestionChange(payload: any, episodeId: string): void {
     const record = payload.new;
 
-    // Question activated
+    // FIX: Guard against false QUESTION_CLOSED events from deactivated questions.
+    // The activate-question edge function deactivates the old question by setting
+    // is_active=false. With REPLICA IDENTITY DEFAULT, payload.old only has {id},
+    // so we can't distinguish "deactivated during activation" from "properly closed."
+    //
+    // To mitigate: check if the currently tracked active question matches.
+    // If not, this is likely a deactivation side-effect, not a real close.
+
+    // Question activated — only fire if payload.old doesn't already show it as active
     if (record.is_active && !payload.old?.is_active) {
+      // Deduplication: legacy questions path may race with quiz_events path.
+      const actKey = `act:${episodeId}:${record.id}`;
+      if (this.processedActivationKeys.has(actKey)) return;
+      this.processedActivationKeys.add(actKey);
+
+      this.activeQuestionByEpisode.set(episodeId, record.id);
+
       this.emit({
         type: 'QUESTION_ACTIVATED',
         questionId: record.id,
@@ -317,11 +524,24 @@ class ChannelManager {
       });
     }
 
-    // Question closed — guard against false duplicates using a tracked Set
-    // because payload.old may only contain the primary key (default replication mode),
-    // causing every subsequent update to a closed question to fire QUESTION_CLOSED again.
+    // Question closed — guard: only emit if this is the tracked active question
     if (record.closed_at && !this.closedQuestionIds.has(record.id)) {
+      // Deduplication: legacy questions path may race with quiz_events path.
+      const closeKey = `close:${episodeId}:${record.id}`;
+      if (this.processedCloseKeys.has(closeKey)) return;
+      this.processedCloseKeys.add(closeKey);
+
+      const activeId = this.activeQuestionByEpisode.get(episodeId);
+
+      // Skip if this close event is for a question that's NOT the current active one
+      // (this prevents old question deactivation from firing false QUESTION_CLOSED)
+      if (activeId && record.id !== activeId) {
+        return;
+      }
+
       this.closedQuestionIds.add(record.id);
+      this.activeQuestionByEpisode.delete(episodeId);
+
       this.emit({
         type: 'QUESTION_CLOSED',
         questionId: record.id,

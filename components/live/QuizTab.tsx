@@ -4,7 +4,7 @@
  * State machine: idle → question → revealing → between → complete
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
@@ -54,9 +54,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
 
   // Store actions
   const setSelectedOption = useLiveQuizStore((s) => s.setSelectedOption);
-  const tickTimer = useLiveQuizStore((s) => s.tickTimer);
   const submitAnswer = useLiveQuizStore((s) => s.submitAnswer);
-  const showBetweenLeaderboard = useLiveQuizStore((s) => s.showBetweenLeaderboard);
   const handleQuestionClosed = useLiveQuizStore((s) => s.handleQuestionClosed);
 
   // Mutations
@@ -68,6 +66,19 @@ export function QuizTab({ episodeId }: QuizTabProps) {
   const questionStartTime = useRef<number>(0);
   const autoCloseTriggered = useRef(false);
   const handleAutoCloseRef = useRef<typeof handleAutoClose>(() => {});
+
+  // Local state for immediate visual feedback on option selection
+  // (bypasses any async delays from Zustand store updates)
+  const [localSelectedOption, setLocalSelectedOption] = useState<string | null>(null);
+  const prevQuestionId = useRef<string | null>(null);
+
+  // Reset local state when question changes
+  useEffect(() => {
+    if (currentQuestion?.id && currentQuestion.id !== prevQuestionId.current) {
+      setLocalSelectedOption(null);
+      prevQuestionId.current = currentQuestion.id;
+    }
+  }, [currentQuestion?.id]);
 
   // Pulse animation for idle
   const pulseOpacity = useSharedValue(1);
@@ -111,18 +122,9 @@ export function QuizTab({ episodeId }: QuizTabProps) {
       }, 1000);
       return () => clearInterval(interval);
     }
-
-    if (phase === 'revealing') {
-      const timeout = setTimeout(showBetweenLeaderboard, 4000);
-      return () => clearTimeout(timeout);
-    }
-
-    if (phase === 'between') {
-      const timeout = setTimeout(() => {
-        // Wait for next question from realtime
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
+    // NOTE: revealing → between/complete transition is now driven by
+    // QUESTION_DISMISSED realtime events, NOT a timer. The admin must
+    // dismiss the question before the leaderboard shows.
   }, [phase, currentQuestion?.id]);
 
   const handleAutoClose = useCallback(async () => {
@@ -146,7 +148,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
       // placeholder 'a' from the QUESTION_ACTIVATED event (correct answer
       // is never included in that event for security).
       if (result.correctOption) {
-        handleQuestionClosed(result.correctOption);
+        handleQuestionClosed(result.correctOption, currentQuestion.id);
       }
     } catch (err) {
       // Question might already be closed by another client or admin.
@@ -164,6 +166,8 @@ export function QuizTab({ episodeId }: QuizTabProps) {
     if (hasSubmitted.current || !currentQuestion || !episodeId || !user) return;
 
     hasSubmitted.current = true;
+    // Set local state immediately for instant visual feedback
+    setLocalSelectedOption(optionKey);
     setSelectedOption(optionKey);
 
     const responseTimeMs = Date.now() - questionStartTime.current;
@@ -218,11 +222,13 @@ export function QuizTab({ episodeId }: QuizTabProps) {
   const getOptionStyle = (optionKey: string) => {
     if (!currentQuestion) return { bg: colors.surface, border: colors.border, textColor: colors.foreground, isDisabled: false };
 
-    const isSelected = selectedOption === optionKey;
+    // Use local state for immediate visual feedback, fall back to store state
+    const effectiveSelection = localSelectedOption ?? selectedOption;
+    const isSelected = effectiveSelection === optionKey;
     const isCorrectOpt = currentQuestion.correct_option === optionKey;
     const isRevealing = phase === 'revealing';
     const isWrong = isRevealing && isSelected && !lastAnswer?.isCorrect;
-    const isDisabled = selectedOption !== null || isRevealing;
+    const isDisabled = effectiveSelection !== null || isRevealing;
 
     let bg = colors.surface;
     let border = colors.border;
@@ -446,7 +452,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
                 {phase === 'revealing' && currentQuestion.correct_option === opt.key && (
                   <Feather name="check-circle" size={18} color={colors.success} />
                 )}
-                {phase === 'revealing' && selectedOption === opt.key && !wasCorrect && (
+                {phase === 'revealing' && (localSelectedOption ?? selectedOption) === opt.key && !wasCorrect && (
                   <Feather name="x-circle" size={18} color={colors.danger} />
                 )}
               </TouchableOpacity>
@@ -455,7 +461,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
         </View>
 
         {/* Locked indicator (question phase) */}
-        {selectedOption && phase === 'question' && (
+        {(localSelectedOption ?? selectedOption) && phase === 'question' && (
           <View style={[styles.lockedBox, { backgroundColor: `${colors.primary}15`, borderColor: colors.primary }]}>
             <Feather name="lock" size={14} color={colors.primary} />
             <Text style={[styles.lockedText, { color: colors.primary }]}>
@@ -513,7 +519,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 20, gap: 16 },
+  scrollContent: { padding: 16, gap: 14 },
   scrollFull: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
 
   // Between phase
@@ -544,14 +550,20 @@ const styles = StyleSheet.create({
   },
   timerBar: { position: 'absolute', left: 0, top: 0, bottom: 0 },
   timerText: { fontSize: 14, fontWeight: '700', zIndex: 1 },
-  optionsContainer: { gap: 12 },
-  optionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 16, borderRadius: 14, borderWidth: 2,
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  optionLabel: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  optionLabelText: { fontSize: 14, fontWeight: '800' },
-  optionText: { flex: 1, fontSize: 15, fontWeight: '500', lineHeight: 21 },
+  optionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 12, paddingHorizontal: 12,
+    borderRadius: 12, borderWidth: 1.5,
+    width: '48%',
+  },
+  optionLabel: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  optionLabelText: { fontSize: 12, fontWeight: '800' },
+  optionText: { flex: 1, fontSize: 13, fontWeight: '500', lineHeight: 18 },
   lockedBox: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     padding: 14, borderRadius: 14, borderWidth: 1.5,
