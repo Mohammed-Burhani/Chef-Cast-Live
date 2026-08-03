@@ -17,6 +17,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PushNotificationsProvider } from "@/components/PushNotificationsProvider";
 import { useAuthStore } from "@/store/useAuthStore";
 import { handleDeepLink } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
@@ -138,7 +139,9 @@ export default function RootLayout() {
           <ToastProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
               <KeyboardProvider>
-                <RootLayoutNav />
+                <PushNotificationsProvider>
+                  <RootLayoutNav />
+                </PushNotificationsProvider>
               </KeyboardProvider>
             </GestureHandlerRootView>
           </ToastProvider>

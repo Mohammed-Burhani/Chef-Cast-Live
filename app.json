@@ -28,6 +28,10 @@
       "output": "static",
       "bundler": "metro"
     },
+    "notification": {
+      "vapidPublicKey": "REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY",
+      "serviceWorkerPath": "/expo-service-worker.js"
+    },
     "plugins": [
       [
         "expo-router",

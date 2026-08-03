@@ -67,6 +67,7 @@ export interface Database {
           thumbnail_url: string | null
           youtube_url: string | null
           default_timer_seconds: number
+          live_notification_sent: boolean
           created_at: string
         }
         Insert: {
@@ -80,6 +81,7 @@ export interface Database {
           thumbnail_url?: string | null
           youtube_url?: string | null
           default_timer_seconds?: number
+          live_notification_sent?: boolean
           created_at?: string
         }
         Update: {
@@ -93,6 +95,7 @@ export interface Database {
           thumbnail_url?: string | null
           youtube_url?: string | null
           default_timer_seconds?: number
+          live_notification_sent?: boolean
           created_at?: string
         }
         Relationships: []
