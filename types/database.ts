@@ -22,6 +22,7 @@ export interface Database {
           total_correct: number
           episodes_participated: number
           is_admin: boolean
+          email_notifications_enabled: boolean
           created_at: string
         }
         Insert: {
@@ -33,6 +34,7 @@ export interface Database {
           total_correct?: number
           episodes_participated?: number
           is_admin?: boolean
+          email_notifications_enabled?: boolean
           created_at?: string
         }
         Update: {
@@ -44,6 +46,7 @@ export interface Database {
           total_correct?: number
           episodes_participated?: number
           is_admin?: boolean
+          email_notifications_enabled?: boolean
           created_at?: string
         }
         Relationships: [
@@ -68,6 +71,7 @@ export interface Database {
           youtube_url: string | null
           default_timer_seconds: number
           live_notification_sent: boolean
+          live_email_sent: boolean
           created_at: string
         }
         Insert: {
@@ -82,6 +86,7 @@ export interface Database {
           youtube_url?: string | null
           default_timer_seconds?: number
           live_notification_sent?: boolean
+          live_email_sent?: boolean
           created_at?: string
         }
         Update: {
@@ -96,6 +101,7 @@ export interface Database {
           youtube_url?: string | null
           default_timer_seconds?: number
           live_notification_sent?: boolean
+          live_email_sent?: boolean
           created_at?: string
         }
         Relationships: []

@@ -7,6 +7,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import { Platform } from 'react-native';
+import { router } from 'expo-router';
 
 import { supabase } from './supabase';
 
@@ -123,12 +124,20 @@ export async function signInAnonymously() {
 }
 
 /**
- * Handle deep link for magic link callback
+ * Handle deep links opened into the app:
+ *  - magic link callbacks
+ *  - the go-live email's "View Live in App" button (chefcast-live://episode/<id>)
+ *  - the go-live email's unsubscribe link (chefcast-live://email/unsubscribe)
+ *
+ * expo-router would also resolve these routes on its own; this explicit handling
+ * is a safety net so navigation happens even if the router's automatic linking
+ * is pre-empted by the manual listener in app/_layout.tsx.
  */
 export async function handleDeepLink(url: string) {
   try {
     const { path, queryParams } = Linking.parse(url);
-    
+    const normalized = (path ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
+
     // Magic link callback contains token_hash and type=magiclink
     if (queryParams?.token_hash && queryParams?.type === 'magiclink') {
       const { error } = await supabase.auth.verifyOtp({
@@ -137,6 +146,19 @@ export async function handleDeepLink(url: string) {
       });
 
       if (error) throw error;
+      return { success: true };
+    }
+
+    // Unsubscribe link → email-unsubscribe screen
+    if (normalized === 'email/unsubscribe' || normalized === 'email-unsubscribe') {
+      router.replace('/email-unsubscribe');
+      return { success: true };
+    }
+
+    // "View Live in App" button → episode screen
+    const episodeMatch = normalized.match(/^episode\/(.+)$/);
+    if (episodeMatch) {
+      router.replace(`/episode/${episodeMatch[1]}`);
       return { success: true };
     }
 

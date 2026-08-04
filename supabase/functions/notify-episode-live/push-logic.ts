@@ -25,9 +25,12 @@ export function json(body: Record<string, unknown>, status = 200) {
 export interface EpisodeRow {
   id: string;
   title: string;
+  description?: string | null;
+  thumbnail_url?: string | null;
   status: string;
   is_live: boolean;
   live_notification_sent: boolean;
+  live_email_sent?: boolean;
 }
 
 export interface PushTokenRow {
@@ -108,13 +111,306 @@ export function processExpoReceipts(
   return { sent, invalidTokenIds };
 }
 
+// ============================================================================
+// EMAIL — "episode is live" mailer
+//
+// All of it runs best-effort after the push channel: a failing SMTP must never
+// take down the push notification. Every failure is counted and reported, so
+// it is visible in the edge function logs.
+// ============================================================================
+
+/** Row shape used by the live-email path. */
+export interface EmailEpisode {
+  id: string;
+  title: string;
+  description?: string | null;
+  thumbnail_url?: string | null;
+}
+
+/** A fully-assembled email, ready for the transport. */
+export interface LiveEmail {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+export interface EmailSendResult {
+  sent: number;
+  failed: number;
+  errors: string[];
+}
+
+/** The mail-transport surface the handler needs (nodemailer in index.ts). */
+export type MailSender = (opts: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  headers?: Record<string, string>;
+}) => Promise<void>;
+
+/** Escape a value so it is safe to interpolate into HTML. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Collapse whitespace and trim a long description for the email body. */
+export function truncate(text: string | null | undefined, max = 180): string {
+  const cleaned = (text ?? '').trim().replace(/\s+/g, ' ');
+  if (cleaned.length <= max) return cleaned;
+  return `${cleaned.slice(0, max - 1).trimEnd()}…`;
+}
+
+/**
+ * Builds the go-live email with:
+ *  - a highlighted "View Live in App" button   (appDeepLink)
+ *  - a "View Live on the Website" button        (webUrl)
+ *  - an unsubscribe link                        (unsubscribeUrl)
+ */
+export function buildLiveEmail(
+  episode: EmailEpisode,
+  links: { appDeepLink: string; webUrl: string; unsubscribeUrl: string },
+): LiveEmail {
+  const title = escapeHtml(episode.title);
+  const description = escapeHtml(truncate(episode.description));
+  const appButton = emailButton('View Live in App', links.appDeepLink, '#0D0D0D', '#FFB347');
+  const webButton = emailButton('View Live on the Website', links.webUrl, '#0D0D0D', '#F5E9D0');
+  const thumbnailHtml = episode.thumbnail_url
+    ? `<tr><td align="center" style="padding:8px 32px 0;">
+         <img src="${escapeHtml(episode.thumbnail_url)}" alt="" width="100%" style="max-width:456px;height:auto;border-radius:12px;display:block;" />
+       </td></tr>`
+    : '';
+
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#0D0D0D;-webkit-text-size-adjust:100%;word-break:break-word;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0D0D0D;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#1A1A1A;border-radius:16px;">
+            <tr>
+              <td style="padding:32px 32px 16px;text-align:center;">
+                <p style="margin:0;color:#FFB347;font-size:14px;font-weight:bold;letter-spacing:1px;">CHEFCAST: LIVE</p>
+                <h1 style="margin:12px 0 0;color:#FFFFFF;font-size:26px;line-height:1.3;">It&rsquo;s live! 🍳</h1>
+                <h2 style="margin:8px 0 0;color:#FFB347;font-size:22px;line-height:1.3;">${title}</h2>
+              </td>
+            </tr>
+            ${thumbnailHtml}
+            <tr>
+              <td style="padding:20px 32px 8px;color:#CFCFCF;font-size:15px;line-height:1.6;">
+                ${description || 'The episode is live right now — join the cooking quiz!'}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px 8px;text-align:center;">
+                ${appButton}
+                <p style="font-size:0;line-height:0;margin:0;">&nbsp;</p>
+                ${webButton}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px 32px;text-align:center;color:#8A8A8A;font-size:12px;line-height:1.6;">
+                You&rsquo;re receiving this because you subscribe to ChefCast live alerts.<br />
+                <a href="${links.unsubscribeUrl}" style="color:#AAAAAA;text-decoration:underline;">Unsubscribe from live episode emails</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  const text = [
+    `It's live! 🍳 ${episode.title}`,
+    '',
+    truncate(episode.description) || 'The episode is live right now — join the cooking quiz!',
+    '',
+    `Watch in the app: ${links.appDeepLink}`,
+    `Watch on the website: ${links.webUrl}`,
+    '',
+    `Unsubscribe: ${links.unsubscribeUrl}`,
+  ].join('\n');
+
+  return {
+    subject: `🍳 ${episode.title} is LIVE — watch now!`,
+    html,
+    text,
+  };
+}
+
+/** An email-client-safe table-based button (no <div>, no padding on <a> only). */
+function emailButton(label: string, href: string, textColor: string, bgColor: string): string {
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 10px;">
+      <tr>
+        <td align="center" style="border-radius:12px;background:${bgColor};">
+          <a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 28px;color:${textColor};text-decoration:none;font-weight:bold;font-size:15px;">${escapeHtml(label)}</a>
+        </td>
+      </tr>
+    </table>`;
+}
+
+/**
+ * Emails for every user who (a) opted in to email notifications and (b) has an
+ * email on their auth account. Anonymous/phone-only accounts are skipped, and
+ * duplicate emails are de-duplicated.
+ */
+export async function fetchLiveEmailRecipients(
+  supabaseClient: HandlerDeps['supabaseClient'],
+): Promise<string[]> {
+  // Opted-in profile ids.
+  const { data: optedIn, error: profilesError } = await supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('email_notifications_enabled', true);
+
+  if (profilesError) throw profilesError;
+  if (!optedIn || optedIn.length === 0) return [];
+
+  const userIds = optedIn.map((row: { id: string }) => row.id);
+
+  // Emails live on auth.users (visible to the service role). If the client
+  // doesn't expose the auth schema (e.g. an old stub), bail gracefully — the
+  // edge function's real client always has it.
+  if (typeof supabaseClient.schema !== 'function') {
+    return [];
+  }
+
+  const { data: users, error: usersError } = await supabaseClient
+    .schema('auth')
+    .from('users')
+    .select('id, email')
+    .in('id', userIds);
+
+  if (usersError) throw usersError;
+
+  const seen = new Set<string>();
+  const emails: string[] = [];
+  for (const user of users ?? []) {
+    const email = typeof user?.email === 'string' ? user.email.trim() : '';
+    if (email && !seen.has(email)) {
+      seen.add(email);
+      emails.push(email);
+    }
+  }
+  return emails;
+}
+
+/** Sends one email per recipient, tolerating individual failures. */
+export async function sendLiveEmails(
+  sendMail: MailSender,
+  recipients: string[],
+  email: LiveEmail,
+  headers?: Record<string, string>,
+): Promise<EmailSendResult> {
+  const result: EmailSendResult = { sent: 0, failed: 0, errors: [] };
+  for (const to of recipients) {
+    try {
+      await sendMail({ to, subject: email.subject, html: email.html, text: email.text, headers });
+      result.sent += 1;
+    } catch (error) {
+      result.failed += 1;
+      result.errors.push(`to ${to}: ${(error as Error)?.message ?? String(error)}`);
+    }
+  }
+  return result;
+}
+
+/** Atomically flips a boolean "sent" guard; true only if THIS call flipped it. */
+async function claimOnce(
+  deps: HandlerDeps,
+  episodeId: string,
+  column: 'live_notification_sent' | 'live_email_sent',
+): Promise<boolean> {
+  const { data, error } = await deps.supabaseClient
+    .from('episodes')
+    .update({ [column]: true })
+    .eq('id', episodeId)
+    .eq(column, false)
+    .select('id');
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
+export type LiveEmailResult = {
+  status: 'skipped' | 'already' | 'sent' | 'failed';
+  sent?: number;
+  failed?: number;
+  errors?: string[];
+  reason?: string;
+};
+
+/**
+ * Sends the go-live email to every opted-in user, guarded by the
+ * `live_email_sent` claim. Never throws — any failure is captured in the result
+ * so the push channel (and the overall request) keeps working.
+ */
+async function sendEpisodeLiveEmails(deps: HandlerDeps, episode: EpisodeRow): Promise<LiveEmailResult> {
+  if (typeof deps.sendMail !== 'function') {
+    return { status: 'skipped', reason: 'no_mail_sender' };
+  }
+
+  try {
+    if (!(await claimOnce(deps, episode.id, 'live_email_sent'))) {
+      return { status: 'already' };
+    }
+  } catch (error) {
+    return { status: 'failed', failed: 0, reason: `claim: ${(error as Error)?.message}` };
+  }
+
+  try {
+    const webUrl = (deps.getEnv('WEB_APP_URL') ?? '').replace(/\/+$/, '');
+    const email = buildLiveEmail(
+      {
+        id: episode.id,
+        title: episode.title,
+        description: episode.description,
+        thumbnail_url: episode.thumbnail_url,
+      },
+      {
+        appDeepLink: `chefcast-live://episode/${episode.id}`,
+        webUrl: `${webUrl}/episode/${episode.id}`,
+        unsubscribeUrl: 'chefcast-live://email/unsubscribe',
+      },
+    );
+
+    const recipients = await fetchLiveEmailRecipients(deps.supabaseClient);
+    if (recipients.length === 0) {
+      return { status: 'sent', sent: 0, failed: 0 };
+    }
+
+    // RFC 2369 header so Gmail/Outlook render their own "Unsubscribe" button.
+    const listUnsubscribeHeader =
+      webUrl.length > 0 ? { 'List-Unsubscribe': `<${webUrl}/email-unsubscribe>` } : undefined;
+
+    const result = await sendLiveEmails(deps.sendMail, recipients, email, listUnsubscribeHeader);
+    return {
+      status: 'sent',
+      sent: result.sent,
+      failed: result.failed,
+      errors: result.errors.length > 0 ? result.errors : undefined,
+    };
+  } catch (error) {
+    return { status: 'failed', failed: 0, reason: (error as Error)?.message ?? String(error) };
+  }
+}
+
 /** Minimal surface the handler needs from the Supabase client. */
 export interface HandlerDeps {
   supabaseClient: {
     from: (table: string) => any;
+    schema?: (schema: string) => { from: (table: string) => any };
   };
   getEnv: (key: string) => string | undefined;
   fetchFn: (url: string, init?: any) => Promise<any>;
+  /** nodemailer-backed sender (see index.ts). Absent → email channel skipped. */
+  sendMail?: MailSender;
 }
 
 /**
@@ -143,7 +439,7 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     // 1) Load the episode
     const { data: episode, error: episodeError } = await deps.supabaseClient
       .from('episodes')
-      .select('id, title, status, is_live, live_notification_sent')
+      .select('id, title, description, thumbnail_url, status, is_live, live_notification_sent, live_email_sent')
       .eq('id', episodeId)
       .single();
 
@@ -156,20 +452,14 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
       return json({ error: 'Episode is not live' }, 409);
     }
 
-    // 2) Atomically claim the "send once" flag. If zero rows were updated,
-    //    another invocation already sent — skip without double-notifying.
-    const { data: claimed, error: claimError } = await deps.supabaseClient
-      .from('episodes')
-      .update({ live_notification_sent: true })
-      .eq('id', episodeId)
-      .eq('live_notification_sent', false)
-      .select('id');
+    // 2) EMAIL channel (best-effort — a mail failure must never block the push)
+    const emailResult = await sendEpisodeLiveEmails(deps, episode);
 
-    if (claimError) {
-      throw claimError;
-    }
-    if (!claimed || claimed.length === 0) {
-      return json({ ok: true, skipped: 'already_sent' });
+    // 3) PUSH channel — atomically claim the "send once" flag. If zero rows
+    //    were updated, another invocation already sent the push; skip without
+    //    double-notifying.
+    if (!(await claimOnce(deps, episodeId, 'live_notification_sent'))) {
+      return json({ ok: true, skipped: 'already_sent', email: emailResult });
     }
 
     // 3) Fetch every registered push token
@@ -224,6 +514,7 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
       sent,
       totalTokens: tokens.length,
       invalidTokensRemoved: invalidTokenIds.length,
+      email: emailResult,
     });
   } catch (error) {
     console.error('Edge Function error:', error);

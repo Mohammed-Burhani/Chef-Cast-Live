@@ -40,8 +40,9 @@ function RootLayoutNav() {
     const inTabsGroup = segments[0] === '(tabs)';
     const isAdmin = user?.role === 'admin';
 
-    // Not logged in → force to auth
-    if (!isLoggedIn && !inAuthGroup && segments[0] !== 'splash') {
+    // Not logged in → force to auth (email-unsubscribe must stay reachable so
+    // the email's unsubscribe link works for signed-out users too).
+    if (!isLoggedIn && !inAuthGroup && segments[0] !== 'splash' && segments[0] !== 'email-unsubscribe') {
       router.replace('/(auth)/login');
       return;
     }
@@ -83,6 +84,7 @@ function RootLayoutNav() {
       <Stack.Screen name="mystery-box" options={{ presentation: "modal" }} />
       <Stack.Screen name="scanner" options={{ presentation: "modal" }} />
       <Stack.Screen name="episode/[id]" />
+      <Stack.Screen name="email-unsubscribe" />
     </Stack>
   );
 }
