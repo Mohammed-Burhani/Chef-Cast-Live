@@ -92,6 +92,67 @@ export async function deleteEpisode(id: string) {
   if (error) throw error;
 }
 
+// Duplicate an episode for a future broadcast: copies all episode details and
+// its quiz questions, but with a fresh schedule (admin picks the date first).
+export async function duplicateEpisode(sourceEpisodeId: string, newScheduledAt: string) {
+  const [episodeRes, questionsRes] = await Promise.all([
+    supabase
+      .from('episodes')
+      .select('*')
+      .eq('id', sourceEpisodeId)
+      .single(),
+    supabase
+      .from('questions')
+      .select('*')
+      .eq('episode_id', sourceEpisodeId)
+      .order('sequence_number', { ascending: true }),
+  ]);
+
+  if (episodeRes.error) throw episodeRes.error;
+  if (questionsRes.error) throw questionsRes.error;
+
+  const source = episodeRes.data;
+
+  // New episode with the same details, only the schedule differs.
+  const { data: episode, error: insertError } = await supabase
+    .from('episodes')
+    .insert({
+      title: source.title,
+      description: source.description,
+      scheduled_at: newScheduledAt,
+      thumbnail_url: source.thumbnail_url,
+      youtube_url: source.youtube_url,
+      default_timer_seconds: source.default_timer_seconds,
+    })
+    .select('*')
+    .single();
+
+  if (insertError) throw insertError;
+
+  // Copy the quiz over as fresh questions (state fields like is_active,
+  // has_been_activated, opened_at, closed_at are left at their defaults).
+  const questionCopies = (questionsRes.data || []).map((q) => ({
+    episode_id: episode.id,
+    question_text: q.question_text,
+    option_a: q.option_a,
+    option_b: q.option_b,
+    option_c: q.option_c,
+    option_d: q.option_d,
+    correct_option: q.correct_option,
+    timer_seconds: q.timer_seconds,
+    sequence_number: q.sequence_number,
+  }));
+
+  let questionsCopied = 0;
+  if (questionCopies.length > 0) {
+    const { error: qError } = await supabase.from('questions').insert(questionCopies);
+    if (qError) throw qError;
+    questionsCopied = questionCopies.length;
+  }
+
+  return { episode, questionsCopied };
+}
+
 // ============================================================================
 // QUESTIONS
 // ============================================================================

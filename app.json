@@ -20,6 +20,8 @@
       "package": "com.chefcast.live",
       "permissions": [
         "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ]
     },
@@ -62,6 +64,12 @@
         "projectId": "8d89f8a4-3aba-40db-b6d5-f81caa4e3e28"
       }
     },
-    "owner": "burhani-technologies"
+    "owner": "burhani-technologies",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8d89f8a4-3aba-40db-b6d5-f81caa4e3e28"
+    }
   }
 }

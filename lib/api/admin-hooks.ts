@@ -72,6 +72,18 @@ export function useDeleteEpisode() {
   });
 }
 
+export function useDuplicateEpisode() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, newScheduledAt }: { id: string; newScheduledAt: string }) =>
+      adminApi.duplicateEpisode(id, newScheduledAt),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.episodes });
+    },
+  });
+}
+
 // ============================================================================
 // QUESTIONS
 // ============================================================================

@@ -3,17 +3,20 @@
     "local": {
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "local"
     },
     "preview": {
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
-      }
+      },
+      "channel": "production"
     }
   }
 }

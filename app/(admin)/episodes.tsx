@@ -28,6 +28,7 @@ import {
   useUpdateEpisode,
   useToggleEpisodeLive,
   useDeleteEpisode,
+  useDuplicateEpisode,
   useCreateQuestion,
 } from '@/lib/api/admin-hooks';
 import { DataTable, Column } from '@/components/admin/DataTable';
@@ -49,6 +50,7 @@ export default function AdminEpisodes() {
   const updateMutation = useUpdateEpisode();
   const deleteMutation = useDeleteEpisode();
   const toggleLiveMutation = useToggleEpisodeLive();
+  const duplicateMutation = useDuplicateEpisode();
   const createQuestionMutation = useCreateQuestion();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -62,6 +64,12 @@ export default function AdminEpisodes() {
     youtube_url: '',
     default_timer_seconds: 30,
   });
+
+  // Duplicate episode state
+  const [duplicateModalVisible, setDuplicateModalVisible] = useState(false);
+  const [duplicateSource, setDuplicateSource] = useState<any>(null);
+  const [duplicateDate, setDuplicateDate] = useState<Date>(new Date());
+  const [duplicateDatePickerOpen, setDuplicateDatePickerOpen] = useState(false);
 
   // Questions state
   const [questions, setQuestions] = useState<QuestionForm[]>([]);
@@ -107,6 +115,39 @@ export default function AdminEpisodes() {
     
     // Load existing questions
     loadEpisodeQuestions(episode.id);
+  };
+
+  const handleDuplicateOpen = (episode: any) => {
+    setDuplicateSource(episode);
+    // Default to the source's schedule when it's still in the future, else tomorrow
+    const sourceDate = new Date(episode.scheduled_at);
+    setDuplicateDate(sourceDate > new Date() ? sourceDate : new Date(Date.now() + 24 * 60 * 60 * 1000));
+    setDuplicateModalVisible(true);
+  };
+
+  const handleDuplicateConfirm = async () => {
+    if (!duplicateSource) return;
+
+    if (duplicateDate.getTime() <= Date.now()) {
+      Alert.alert('Error', 'Please pick a future date & time');
+      return;
+    }
+
+    try {
+      const result = await duplicateMutation.mutateAsync({
+        id: duplicateSource.id,
+        newScheduledAt: duplicateDate.toISOString(),
+      });
+      setDuplicateModalVisible(false);
+      setDuplicateSource(null);
+      toast.success(
+        `"${duplicateSource.title}" duplicated for ${duplicateDate.toLocaleString()}` +
+          (result.questionsCopied > 0 ? ` with ${result.questionsCopied} questions` : '') +
+          ' — edit the details anytime'
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   const loadEpisodeQuestions = async (episodeId: string) => {
@@ -205,26 +246,13 @@ export default function AdminEpisodes() {
     }
   };
 
-  const handleStopLive = (episode: any) => {
-    Alert.alert(
-      'Stop Stream',
-      `End live streaming for "${episode.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Stop',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await toggleLiveMutation.mutateAsync({ episodeId: episode.id, isLive: false });
-              Alert.alert('Success', 'Stream ended');
-            } catch (err: any) {
-              Alert.alert('Error', err.message);
-            }
-          },
-        },
-      ]
-    );
+  const handleStopLive = async (episode: any) => {
+    try {
+      await toggleLiveMutation.mutateAsync({ episodeId: episode.id, isLive: false });
+      toast.success('Stream ended');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
   };
 
   const handleDelete = (episode: any) => {
@@ -306,7 +334,7 @@ export default function AdminEpisodes() {
     {
       key: 'actions',
       label: 'Actions',
-      width: 220,
+      width: 260,
       render: (ep) => (
         <View style={styles.actions}>
           <TouchableOpacity
@@ -321,6 +349,13 @@ export default function AdminEpisodes() {
             onPress={() => router.push({ pathname: '/(admin)/analytics', params: { episodeId: ep.id } } as any)}
           >
             <Feather name="bar-chart-2" size={14} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.warning }]}
+            onPress={() => handleDuplicateOpen(ep)}
+          >
+            <Feather name="copy" size={14} color="#fff" />
           </TouchableOpacity>
 
           {!ep.ended_at && (
@@ -418,7 +453,15 @@ export default function AdminEpisodes() {
                 />
 
                 <Text style={[styles.label, { color: colors.foreground }]}>Scheduled Date & Time *</Text>
-                {Platform.OS === 'web' ? (
+                {editingEpisode?.is_live ? (
+                  <View style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border, opacity: 0.6 }]}>
+                    <Feather name="calendar" size={18} color={colors.mutedForeground} />
+                    <Text style={[styles.dateButtonText, { color: colors.mutedForeground }]}>
+                      {formData.scheduled_at.toLocaleString()}
+                    </Text>
+                    <Feather name="lock" size={14} color={colors.mutedForeground} />
+                  </View>
+                ) : Platform.OS === 'web' ? (
                   // Web: Native HTML datetime-local input
                   <input
                     type="datetime-local"
@@ -452,6 +495,11 @@ export default function AdminEpisodes() {
                       {formData.scheduled_at.toLocaleString()}
                     </Text>
                   </TouchableOpacity>
+                )}
+                {editingEpisode?.is_live && (
+                  <Text style={[styles.helperText, { color: colors.warning, marginTop: 4 }]}>
+                    Date cannot be changed while the stream is live
+                  </Text>
                 )}
 
                 <Text style={[styles.label, { color: colors.foreground }]}>YouTube Live URL (Optional)</Text>
@@ -705,6 +753,86 @@ export default function AdminEpisodes() {
         </View>
       </Modal>
 
+      {/* Duplicate Episode Modal */}
+      <Modal visible={duplicateModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Duplicate Episode</Text>
+              <TouchableOpacity onPress={() => setDuplicateModalVisible(false)}>
+                <Feather name="x" size={24} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <View style={[styles.duplicateInfo, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.duplicateInfoTitle, { color: colors.foreground }]}>
+                  "{duplicateSource?.title}"
+                </Text>
+                <Text style={[styles.duplicateInfoText, { color: colors.mutedForeground }]}>
+                  Everything will be copied — title, description, thumbnail, YouTube link, default timer,
+                  and quiz questions. Only the schedule changes.
+                </Text>
+              </View>
+
+              <Text style={[styles.label, { color: colors.foreground }]}>New Schedule Date & Time *</Text>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="datetime-local"
+                  value={duplicateDate.toISOString().slice(0, 16)}
+                  onChange={(e) => {
+                    const newDate = new Date(e.target.value);
+                    if (!isNaN(newDate.getTime())) {
+                      setDuplicateDate(newDate);
+                    }
+                  }}
+                  min={new Date().toISOString().slice(0, 16)}
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    fontSize: 16,
+                    borderRadius: 8,
+                    border: `1px solid ${colors.border}`,
+                    backgroundColor: colors.background,
+                    color: colors.foreground,
+                    fontFamily: 'inherit',
+                  }}
+                />
+              ) : (
+                <TouchableOpacity
+                  style={[styles.dateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => setDuplicateDatePickerOpen(true)}
+                >
+                  <Feather name="calendar" size={18} color={colors.primary} />
+                  <Text style={[styles.dateButtonText, { color: colors.foreground }]}>
+                    {duplicateDate.toLocaleString()}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
+                You can edit any details after duplicating.
+              </Text>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.muted }]}
+                onPress={() => setDuplicateModalVisible(false)}
+              >
+                <Text style={[styles.modalBtnText, { color: colors.foreground }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+                onPress={handleDuplicateConfirm}
+              >
+                <Text style={[styles.modalBtnText, { color: '#fff' }]}>Duplicate</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Date Picker - Mobile Only */}
       {Platform.OS !== 'web' && datePickerOpen && (
         <DateTimePicker
@@ -720,6 +848,27 @@ export default function AdminEpisodes() {
             }
             if (event.type === 'dismissed' && Platform.OS === 'ios') {
               setDatePickerOpen(false);
+            }
+          }}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Duplicate Date Picker - Mobile Only */}
+      {Platform.OS !== 'web' && duplicateDatePickerOpen && (
+        <DateTimePicker
+          value={duplicateDate}
+          mode="datetime"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, selectedDate) => {
+            if (Platform.OS === 'android') {
+              setDuplicateDatePickerOpen(false);
+            }
+            if (selectedDate) {
+              setDuplicateDate(selectedDate);
+            }
+            if (event.type === 'dismissed' && Platform.OS === 'ios') {
+              setDuplicateDatePickerOpen(false);
             }
           }}
           minimumDate={new Date()}
@@ -913,6 +1062,14 @@ const styles = StyleSheet.create({
   },
   manageQuestionsText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   helperText: { fontSize: 12, marginTop: 6 },
+  duplicateInfo: {
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  duplicateInfoTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  duplicateInfoText: { fontSize: 13, lineHeight: 18 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

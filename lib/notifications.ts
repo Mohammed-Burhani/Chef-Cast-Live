@@ -17,6 +17,12 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
+import {
+  episodeIdFromLiveNotification,
+  pushPlatformFor,
+  type EpisodeLiveNotificationData,
+  type PushPlatform,
+} from './notification-utils';
 
 /**
  * Foreground behaviour: show a banner + list row + sound while the app is open.
@@ -31,7 +37,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export type PushPlatform = 'ios' | 'android' | 'web';
+// Re-exported from notification-utils.ts so existing importers keep working.
+export type { PushPlatform, EpisodeLiveNotificationData } from './notification-utils';
 
 /** The EAS project id, used by Expo's servers to mint a push token. */
 const PROJECT_ID =
@@ -128,15 +135,6 @@ export async function removePushToken(token?: string | null): Promise<void> {
   }
 }
 
-/** Payload attached to the "episode is live" push. */
-export interface EpisodeLiveNotificationData {
-  type: 'episode-live';
-  episodeId: string;
-  episodeTitle?: string;
-  /** Relative URL used by the web service worker to open the episode. */
-  url?: string;
-}
-
 /**
  * Extracts the episode id from a notification payload — returns `null` for any
  * notification that isn't an "episode is live" alert.
@@ -144,20 +142,14 @@ export interface EpisodeLiveNotificationData {
 export function getEpisodeIdFromNotification(
   notification: Notifications.Notification
 ): string | null {
-  const data = notification.request.content.data as
-    | Partial<EpisodeLiveNotificationData>
-    | undefined;
-
-  if (!data || data.type !== 'episode-live') return null;
-  if (typeof data.episodeId !== 'string' || !data.episodeId) return null;
-  return data.episodeId;
+  return episodeIdFromLiveNotification(
+    notification.request.content.data as Partial<EpisodeLiveNotificationData> | undefined,
+  );
 }
 
 /**
  * The platform label stored in `push_tokens.platform`.
  */
 export function currentPushPlatform(): PushPlatform {
-  if (Platform.OS === 'android') return 'android';
-  if (Platform.OS === 'web') return 'web';
-  return 'ios';
+  return pushPlatformFor(Platform.OS);
 }

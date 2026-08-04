@@ -72,11 +72,11 @@ CREATE TRIGGER on_episode_live_notify
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- Remove any previous version of the job so re-running this migration is safe.
--- Use cron.unschedule (SECURITY DEFINER) — the dashboard role has no DELETE
--- privilege on cron.job.
-SELECT cron.unschedule(jobid)
-FROM cron.job
-WHERE jobname = 'auto-live-episodes';
+-- cron.unschedule(jobname) is SECURITY DEFINER and takes the name directly, so
+-- no SELECT privilege on cron.job is required. (The previous version read
+-- cron.job and failed with "permission denied for table job" 42501 for any
+-- non-superuser role.) Returns false if no such job exists — safe to re-run.
+SELECT cron.unschedule('auto-live-episodes');
 
 SELECT cron.schedule(
   'auto-live-episodes',
