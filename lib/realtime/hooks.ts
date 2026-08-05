@@ -5,7 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 import { channelManager } from './channelManager';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import type {
   ConnectionStatus,
   QuestionActivatedEvent,
@@ -14,6 +14,7 @@ import type {
   LeaderboardUpdatedEvent,
   EpisodeWentLiveEvent,
   EpisodeEndedEvent,
+  EpisodeUpdatedEvent,
   BadgeAwardedEvent,
   XpUpdatedEvent,
   NewDishPhotoEvent,
@@ -195,6 +196,32 @@ export function useEpisodeStateEvents(
       unsubscribers.forEach((unsub) => unsub());
     };
   }, [episodeId]);
+}
+
+/**
+ * Subscribe to global episode updates (the `episode-feed` channel).
+ *
+ * Used by the home screen to refresh the "Going Live Soon" rail and live banner
+ * the moment a scheduled episode flips to live — no 30s poll wait.
+ */
+export function useEpisodeFeedEvents(handler: (event: EpisodeUpdatedEvent) => void): void {
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
+
+  useEffect(() => {
+    channelManager.subscribeToEpisodeFeed();
+
+    const unsub = channelManager.on('EPISODE_UPDATED', (event) => {
+      if (handlerRef.current) {
+        handlerRef.current(event);
+      }
+    });
+
+    return unsub;
+  }, []);
 }
 
 /**

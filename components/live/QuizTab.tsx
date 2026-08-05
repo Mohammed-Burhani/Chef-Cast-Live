@@ -14,7 +14,7 @@ import Animated, {
   withRepeat,
 } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useLiveQuizStore, useLiveQuizPhase, useLiveCurrentQuestion, useLiveTimerRemaining, useLiveSelectedOption, useLiveTotalScore, useLiveCorrectCount, useLiveLeaderboard, useLiveViewerRank, useLiveCurrentQuestionNumber, useLiveTotalQuestions } from '@/store/useLiveQuizStore';
 import { useSubmitAnswerLive, useCloseQuestion, useUserAnswer } from '@/lib/api/live';
 import { StartingSoon } from './StartingSoon';
@@ -216,18 +216,30 @@ export function QuizTab({ episodeId }: QuizTabProps) {
     return colors.danger;
   };
 
-  // Last answer info (for revealing phase)
+  // Last answer info (for revealing phase) — used for the earned points display
   const lastAnswer = useLiveQuizStore((s) => s.userAnswers[s.userAnswers.length - 1]);
+
+  // The option the user locked in for the current question.
+  const effectiveSelection = localSelectedOption ?? selectedOption;
+
+  // Correctness for the revealing phase is derived synchronously from the
+  // user's selection vs. the revealed correct option. Relying on
+  // lastAnswer.isCorrect is unsafe: the score-answer mutation may still be in
+  // flight when the question closes (e.g. an answer tapped at the last second),
+  // which made a correct answer render as "Wrong" and broke the score.
+  const wasCorrect =
+    phase === 'revealing'
+      ? effectiveSelection !== null && effectiveSelection === currentQuestion?.correct_option
+      : (lastAnswer?.isCorrect ?? false);
 
   const getOptionStyle = (optionKey: string) => {
     if (!currentQuestion) return { bg: colors.surface, border: colors.border, textColor: colors.foreground, isDisabled: false };
 
     // Use local state for immediate visual feedback, fall back to store state
-    const effectiveSelection = localSelectedOption ?? selectedOption;
     const isSelected = effectiveSelection === optionKey;
     const isCorrectOpt = currentQuestion.correct_option === optionKey;
     const isRevealing = phase === 'revealing';
-    const isWrong = isRevealing && isSelected && !lastAnswer?.isCorrect;
+    const isWrong = isRevealing && isSelected && !wasCorrect;
     const isDisabled = effectiveSelection !== null || isRevealing;
 
     let bg = colors.surface;
@@ -360,7 +372,6 @@ export function QuizTab({ episodeId }: QuizTabProps) {
   if (!currentQuestion) return null;
 
   const pointsEarned = lastAnswer?.pointsEarned ?? 0;
-  const wasCorrect = lastAnswer?.isCorrect ?? false;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -470,23 +481,11 @@ export function QuizTab({ episodeId }: QuizTabProps) {
           </View>
         )}
 
-        {/* Score row (question phase) */}
-        {phase === 'question' && (
-          <View style={styles.scoreRow}>
-            <View style={styles.scoreItem}>
-              <Text style={[styles.scoreValue, { color: colors.accent }]}>
-                {totalScore.toLocaleString()}
-              </Text>
-              <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>Score</Text>
-            </View>
-            <View style={styles.scoreItem}>
-              <Text style={[styles.scoreValue, { color: colors.primary }]}>
-                {correctCount}
-              </Text>
-              <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>Correct</Text>
-            </View>
-          </View>
-        )}
+        {/* NOTE: Score / rank intentionally NOT shown during the question phase.
+            The score-answer edge function scores immediately and pushes a
+            LEADERBOARD_UPDATED realtime event, so totalScore/viewerRank update
+            while the timer is still running. We hold back the reveal so the
+            user only sees score + rank once the timer ends (revealing phase). */}
 
         {/* Stats + Top 3 (revealing phase) */}
         {phase === 'revealing' && (
@@ -569,12 +568,6 @@ const styles = StyleSheet.create({
     padding: 14, borderRadius: 14, borderWidth: 1.5,
   },
   lockedText: { flex: 1, fontSize: 14, fontWeight: '600' },
-
-  // Score row
-  scoreRow: { flexDirection: 'row', gap: 16 },
-  scoreItem: { flex: 1, alignItems: 'center', gap: 4 },
-  scoreValue: { fontSize: 24, fontWeight: '800' },
-  scoreLabel: { fontSize: 12 },
 
   // Revealing
   resultBanner: {

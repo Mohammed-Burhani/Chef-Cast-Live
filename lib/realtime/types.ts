@@ -64,6 +64,20 @@ export type EpisodeEndedEvent = {
   finalScore: number | null;
 };
 
+/**
+ * Emitted by the global `episode-feed` channel on every `episodes` UPDATE.
+ * The home screen listens for these to refresh the "Going Live Soon" rail the
+ * moment a scheduled episode flips to live (instead of waiting for the 30s poll).
+ */
+export type EpisodeUpdatedEvent = {
+  type: 'EPISODE_UPDATED';
+  episodeId: string;
+  title: string;
+  isLive: boolean;
+  status: 'scheduled' | 'live' | 'ended';
+  endedAt: string | null;
+};
+
 export type NewDishPhotoEvent = {
   type: 'NEW_DISH_PHOTO';
   photoId: string;
@@ -122,6 +136,7 @@ export type RealtimeEvent =
   | LeaderboardUpdatedEvent
   | EpisodeWentLiveEvent
   | EpisodeEndedEvent
+  | EpisodeUpdatedEvent
   | NewDishPhotoEvent
   | BadgeAwardedEvent
   | XpUpdatedEvent

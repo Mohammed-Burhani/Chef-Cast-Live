@@ -19,17 +19,20 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useColors } from "@/hooks/useColors";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
 import { useEpisodeStore } from "@/store/episodeStore";
-import { useLiveEpisode, useEpisodes, useDishPhotos } from "@/lib/api/hooks";
-import { useUpcomingEpisodes } from "@/lib/api/live";
+import { useLiveEpisode, useEpisodes, useDishPhotos, keys } from "@/lib/api/hooks";
+import { useUpcomingEpisodes, liveKeys } from "@/lib/api/live";
+import { useEpisodeFeedEvents } from "@/lib/realtime/hooks";
+import { buildUpcomingRail } from "@/lib/home/upcomingRail";
 
 interface Episode {
   id: string;
@@ -145,15 +148,50 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const profile = useAuthStore((s) => s.profile);
+  const user = useAuthStore((s) => s.user);
   const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
   const showPoll = usePollStore((s) => s.showPoll);
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
+  const queryClient = useQueryClient();
+
+  // Live episodes we watched flip from a reminder during this session. Keeps
+  // their card in the rail so it visibly becomes "Join the quiz" the moment the
+  // episode goes live, instead of vanishing on the next refetch.
+  const [transitionedLiveIds, setTransitionedLiveIds] = React.useState<ReadonlySet<string>>(new Set());
+  // Episode ids currently shown as reminders (non-live) in the rail — only
+  // those are allowed to "transform" when they go live. Episodes that were
+  // already live on mount stay out of the rail (the ON AIR banner covers them).
+  const remindersRef = React.useRef<ReadonlySet<string>>(new Set());
+
+  // Real-time: when any episode row changes, refresh the rail + banner at once
+  // (no 30s poll wait) and remember the episode so its card transforms in place.
+  useEpisodeFeedEvents((event) => {
+    queryClient.invalidateQueries({ queryKey: keys.episodes });
+    queryClient.invalidateQueries({ queryKey: liveKeys.upcoming() });
+
+    // Only flip the card if we were actually reminding about this episode.
+    if (event.isLive && remindersRef.current.has(event.episodeId)) {
+      setTransitionedLiveIds((prev) => {
+        if (prev.has(event.episodeId)) return prev;
+        const next = new Set(prev);
+        next.add(event.episodeId);
+        return next;
+      });
+    }
+  });
 
   const { data: liveEpisode } = useLiveEpisode();
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
   const { data: dishPhotos = [] } = useDishPhotos();
   const { data: soonLive } = useUpcomingEpisodes();
+  const railEpisodes = buildUpcomingRail(soonLive, transitionedLiveIds);
+
+  // Keep remindersRef in sync with the latest upcoming data.
+  React.useEffect(() => {
+    remindersRef.current = new Set(
+      (soonLive ?? []).filter((ep) => !ep.is_live).map((ep) => ep.id)
+    );
+  }, [soonLive]);
 
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -226,7 +264,7 @@ export default function HomeScreen() {
             <View>
               <Text style={[styles.greeting, { color: colors.mutedForeground }]}>{getGreeting()},</Text>
               <Text style={[styles.username, { color: colors.foreground }]}>
-                {profile?.username ?? "Chef"}
+                {user?.username ?? "Chef"}
               </Text>
             </View>
             <View style={styles.headerRight}>
@@ -260,14 +298,14 @@ export default function HomeScreen() {
                 }}
               >
                 <Feather name="zap" size={16} color="#fff" />
-                <Text style={styles.joinButtonText}>Join Live Session</Text>
+                <Text style={styles.joinButtonText}>Join the quiz</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Going Live Soon — highlight upcoming/live episodes within 1 hour */}
-        {soonLive && soonLive.some(ep => !ep.is_live) && (
+        {/* Going Live Soon — reminder rail that flips to "Join the quiz" live */}
+        {railEpisodes.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Going Live Soon</Text>
@@ -277,8 +315,12 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalScroll}
             >
-              {soonLive.filter(ep => !ep.is_live).map((ep) => {
-                const isOverdue = new Date(ep.scheduled_at) <= new Date();
+              {railEpisodes.map((ep) => {
+                const isLive = ep.is_live;
+                const isOverdue = !isLive && new Date(ep.scheduled_at) <= new Date();
+                const accent = isLive ? colors.neonRed : isOverdue ? colors.live : colors.accent;
+                const badgeText = isLive ? 'LIVE' : isOverdue ? 'OVERDUE' : 'SOON';
+                const buttonText = isLive ? 'Join the quiz' : isOverdue ? 'Join Now' : 'Set Reminder';
                 return (
                   <TouchableOpacity
                     key={ep.id}
@@ -293,12 +335,12 @@ export default function HomeScreen() {
                         contentFit="cover"
                         transition={200}
                       />
-                      {/* Accent border for soon-to-be-live */}
-                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: isOverdue ? colors.live : colors.accent, borderRadius: 16 }} />
+                      {/* Accent border: red once live */}
+                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: accent, borderRadius: 16 }} />
                       <View style={{ position: 'absolute', top: 8, right: 8 }}>
-                        <View style={[{ backgroundColor: isOverdue ? colors.live : colors.accent, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }]}>
+                        <View style={[{ backgroundColor: accent, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }]}>
                           <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>
-                            {isOverdue ? 'OVERDUE' : 'SOON'}
+                            {badgeText}
                           </Text>
                         </View>
                       </View>
@@ -312,15 +354,19 @@ export default function HomeScreen() {
                         {ep.title}
                       </Text>
                       <View style={styles.episodeMeta}>
-                        <CountdownTimer scheduledAt={ep.scheduled_at} />
+                        {isLive ? (
+                          <Text style={[styles.countdownText, { color: colors.live }]}>LIVE NOW</Text>
+                        ) : (
+                          <CountdownTimer scheduledAt={ep.scheduled_at} />
+                        )}
                       </View>
                     </View>
                     <TouchableOpacity
-                      style={[{ backgroundColor: colors.accent, paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginHorizontal: 10, marginBottom: 10 }]}
+                      style={[{ backgroundColor: accent, paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginHorizontal: 10, marginBottom: 10 }]}
                       onPress={() => router.push(`/live/${ep.id}` as never)}
                     >
                       <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                        {isOverdue ? 'Join Now' : 'Set Reminder'}
+                        {buttonText}
                       </Text>
                     </TouchableOpacity>
                   </TouchableOpacity>

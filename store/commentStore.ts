@@ -22,7 +22,7 @@
 
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore } from './authStore';
+import { useAuthStore } from './useAuthStore';
 import { channelManager } from '@/lib/realtime/channelManager';
 import type { CommentEvent } from '@/lib/realtime/types';
 
@@ -227,7 +227,7 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
         id: result.commentId || `temp-${Date.now()}`,
         episodeId,
         userId,
-        username: useAuthStore.getState().profile?.username || 'You',
+        username: useAuthStore.getState().user?.username || 'You',
         avatarUrl: null,
         text: trimmed,
         createdAt: new Date().toISOString(),

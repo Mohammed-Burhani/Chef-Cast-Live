@@ -29,7 +29,7 @@ import { useLiveSession, useJoinLiveSession, fetchActiveQuestion } from "@/lib/a
 import { useLiveQuizStore } from "@/store/useLiveQuizStore";
 import { useRealtimeStore } from "@/store/realtimeStore";
 import { useEpisodeChannel, useQuestionEvents, useLeaderboardEvents, useQuestionDismissedEvent } from "@/lib/realtime/hooks";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function LiveSessionScreen() {
   const colors = useColors();

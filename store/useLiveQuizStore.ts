@@ -103,6 +103,15 @@ export const useLiveQuizStore = create<LiveQuizState>()((set, get) => ({
   setTotalQuestions: (count) => set({ totalQuestions: count }),
 
   handleQuestionActivated: (question) => {
+    // Idempotency guard: ignore re-activation of the same question. The same
+    // activation can be delivered twice — once via the realtime quiz_events
+    // path and once via the 2s polling fallback in the live screen. Without
+    // this guard the second activation would wipe the user's selection and
+    // bump currentQuestionNumber twice.
+    if (get().currentQuestion?.id === question.id) {
+      return;
+    }
+
     const now = Date.now();
     const openedAt = question.opened_at ? new Date(question.opened_at).getTime() : now;
     const timerSeconds = question.timer_seconds;

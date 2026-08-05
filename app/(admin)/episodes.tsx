@@ -84,6 +84,30 @@ export default function AdminEpisodes() {
     timer_seconds: 30,
   });
 
+  const formatDateTimeLocalValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const webDateInputStyle = {
+    width: '100%',
+    minHeight: 48,
+    padding: '12px 14px',
+    fontSize: 15,
+    lineHeight: '20px',
+    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    backgroundColor: colors.background,
+    color: colors.foreground,
+    fontFamily: 'inherit',
+    boxSizing: 'border-box' as const,
+  };
+
   const handleCreate = () => {
     setEditingEpisode(null);
     setFormData({
@@ -465,24 +489,16 @@ export default function AdminEpisodes() {
                   // Web: Native HTML datetime-local input
                   <input
                     type="datetime-local"
-                    value={formData.scheduled_at.toISOString().slice(0, 16)}
+                    value={formatDateTimeLocalValue(formData.scheduled_at)}
                     onChange={(e) => {
                       const newDate = new Date(e.target.value);
                       if (!isNaN(newDate.getTime())) {
                         setFormData({ ...formData, scheduled_at: newDate });
                       }
                     }}
-                    min={new Date().toISOString().slice(0, 16)}
-                    style={{
-                      width: '100%',
-                      padding: 12,
-                      fontSize: 16,
-                      borderRadius: 8,
-                      border: `1px solid ${colors.border}`,
-                      backgroundColor: colors.background,
-                      color: colors.foreground,
-                      fontFamily: 'inherit',
-                    }}
+                    min={formatDateTimeLocalValue(new Date())}
+                    step={60}
+                    style={webDateInputStyle}
                   />
                 ) : (
                   // Mobile: TouchableOpacity to trigger native picker
@@ -779,24 +795,16 @@ export default function AdminEpisodes() {
               {Platform.OS === 'web' ? (
                 <input
                   type="datetime-local"
-                  value={duplicateDate.toISOString().slice(0, 16)}
+                  value={formatDateTimeLocalValue(duplicateDate)}
                   onChange={(e) => {
                     const newDate = new Date(e.target.value);
                     if (!isNaN(newDate.getTime())) {
                       setDuplicateDate(newDate);
                     }
                   }}
-                  min={new Date().toISOString().slice(0, 16)}
-                  style={{
-                    width: '100%',
-                    padding: 12,
-                    fontSize: 16,
-                    borderRadius: 8,
-                    border: `1px solid ${colors.border}`,
-                    backgroundColor: colors.background,
-                    color: colors.foreground,
-                    fontFamily: 'inherit',
-                  }}
+                  min={formatDateTimeLocalValue(new Date())}
+                  step={60}
+                  style={webDateInputStyle}
                 />
               ) : (
                 <TouchableOpacity

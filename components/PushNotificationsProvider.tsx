@@ -11,15 +11,23 @@
  *
  * Web note: display + click handling is done by the service worker
  * (`public/expo-service-worker.js`); the token is still registered here.
+ *
+ * Expo Go note: the underlying `expo-notifications` package throws on import on
+ * Android inside Expo Go (SDK 53+), so every call here goes through the lazy
+ * helpers in `lib/notifications.ts` and is skipped entirely when `isExpoGo` is
+ * true — the app must keep running normally in Expo Go, push just won't work.
  */
 
 import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { ReactNode, useEffect, useRef } from 'react';
 
 import {
+  addNotificationResponseListener,
   currentPushPlatform,
   getEpisodeIdFromNotification,
+  getLastNotificationResponse,
+  initNotifications,
+  isExpoGo,
   registerForPushNotificationsAsync,
   removePushToken,
   savePushToken,
@@ -37,6 +45,11 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
   const pushTokenRef = useRef<string | null>(null);
   // Episode we still need to open (set on tap / cold start, waits for auth).
   const pendingEpisodeIdRef = useRef<string | null>(null);
+
+  // ── 0) Set the foreground notification handler once at startup ────────────
+  useEffect(() => {
+    initNotifications();
+  }, []);
 
   // ── 1) Register / unregister the device token with the current user ────────
   useEffect(() => {
@@ -66,27 +79,48 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
 
   // ── 2) Notification tap → open the episode (app already running) ──────────
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const episodeId = getEpisodeIdFromNotification(response.notification);
-        if (episodeId) pendingEpisodeIdRef.current = episodeId;
-      }
-    );
+    // No remote notifications arrive in Expo Go — skip the native listeners.
+    if (isExpoGo()) return;
 
-    return () => subscription.remove();
+    let cancelled = false;
+    let subscription: { remove(): void } | null = null;
+
+    addNotificationResponseListener((notification) => {
+      const episodeId = getEpisodeIdFromNotification(notification);
+      if (episodeId) pendingEpisodeIdRef.current = episodeId;
+    }).then((sub) => {
+      if (cancelled) {
+        sub?.remove();
+      } else {
+        subscription = sub;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
   }, []);
 
   // ── 3) Cold start: app opened by tapping a notification ───────────────────
   useEffect(() => {
-    Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        if (!response) return;
-        const episodeId = getEpisodeIdFromNotification(response.notification);
+    if (isExpoGo()) return;
+
+    let cancelled = false;
+
+    getLastNotificationResponse()
+      .then((notification) => {
+        if (cancelled || !notification) return;
+        const episodeId = getEpisodeIdFromNotification(notification);
         if (episodeId) pendingEpisodeIdRef.current = episodeId;
       })
       .catch(() => {
         // Not supported on every platform — safe to ignore.
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ── 4) Navigate once auth is ready ────────────────────────────────────────

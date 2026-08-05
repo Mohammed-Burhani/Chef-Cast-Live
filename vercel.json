@@ -1,12 +1,6 @@
 {
   "buildCommand": "expo export -p web",
   "outputDirectory": "dist",
-  "crons": [
-    {
-      "path": "/api/cron/auto-live",
-      "schedule": "* * * * *"
-    }
-  ],
   "devCommand": "expo",
   "cleanUrls": true,
   "framework": null,

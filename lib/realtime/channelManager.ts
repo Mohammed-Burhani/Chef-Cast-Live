@@ -148,6 +148,51 @@ class ChannelManager {
   }
 
   /**
+   * Subscribe to ALL episode updates — the home screen "Going Live Soon" rail.
+   *
+   * Unlike `subscribeToEpisode` (scoped to one episode's live room), this is a
+   * global feed on the `episodes` table. It emits `EPISODE_UPDATED` whenever any
+   * episode row changes — most importantly when a scheduled episode flips to
+   * live — so the home screen can flip its reminder card to "Join the quiz" in
+   * real time instead of waiting for the 30s poll.
+   */
+  subscribeToEpisodeFeed(): RealtimeChannel {
+    const channelName = 'episode-feed';
+
+    // Return existing channel if already subscribed
+    const existing = this.channels.get(channelName);
+    if (existing) {
+      return existing.channel;
+    }
+
+    this.setConnectionStatus(channelName, 'connecting');
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'episodes',
+        },
+        (payload) => {
+          this.handleEpisodeFeedChange(payload);
+        }
+      )
+      .subscribe((status) => {
+        this.handleSubscriptionStatus(channelName, status);
+      });
+
+    this.channels.set(channelName, {
+      channel,
+      reconnectAttempts: 0,
+    });
+
+    return channel;
+  }
+
+  /**
    * Subscribe to community feed (dish photos)
    */
   subscribeToCommunityFeed(episodeId: string | null): RealtimeChannel {
@@ -394,6 +439,8 @@ class ChannelManager {
     } else if (channelName.startsWith('comments:')) {
       const commentsEpisodeId = channelName.replace('comments:', '');
       this.subscribeToComments(commentsEpisodeId);
+    } else if (channelName === 'episode-feed') {
+      this.subscribeToEpisodeFeed();
     }
   }
 
@@ -592,6 +639,24 @@ class ChannelManager {
             correctCount: viewerData.correct_count,
           }
         : null,
+    });
+  }
+
+  /**
+   * Handle postgres_changes on the episodes table (global feed).
+   * Emits EPISODE_UPDATED for every change; the home screen uses it to refresh
+   * the "Going Live Soon" rail and live banner the moment an episode goes live.
+   */
+  private handleEpisodeFeedChange(payload: any): void {
+    const record = payload.new;
+
+    this.emit({
+      type: 'EPISODE_UPDATED',
+      episodeId: record.id,
+      title: record.title,
+      isLive: record.is_live,
+      status: record.status,
+      endedAt: record.ended_at ?? null,
     });
   }
 
