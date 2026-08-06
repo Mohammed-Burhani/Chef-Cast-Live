@@ -2,7 +2,7 @@
  * Email-unsubscribe screen.
  *
  * Reached from the "Unsubscribe" link in the go-live email, either via the
- * app deep link `chefcast-live://email/unsubscribe` or the website route
+ * app deep link `foodilicious://email/unsubscribe` or the website route
  * `/email-unsubscribe`. Flips `profiles.email_notifications_enabled` off so
  * no further live-episode emails are sent.
  *

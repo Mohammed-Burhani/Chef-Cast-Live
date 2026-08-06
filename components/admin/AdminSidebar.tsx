@@ -51,7 +51,7 @@ export function AdminSidebar() {
         <View style={[styles.logo, { backgroundColor: colors.primary }]}>
           <Feather name="zap" size={24} color="#fff" />
         </View>
-        <Text style={[styles.logoText, { color: colors.foreground }]}>ChefCast Admin</Text>
+        <Text style={[styles.logoText, { color: colors.foreground }]}>Foodilicious Admin</Text>
       </View>
 
       <ScrollView style={styles.nav} contentContainerStyle={styles.navContent} showsVerticalScrollIndicator={false}>

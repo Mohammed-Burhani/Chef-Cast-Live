@@ -1,5 +1,5 @@
 -- ============================================================================
--- ChefCast Live - Complete Database Schema
+-- Foodilicious - Complete Database Schema
 -- Single consolidated schema file with storage buckets
 -- ============================================================================
 

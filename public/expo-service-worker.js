@@ -2,7 +2,7 @@
 /* globals self, clients */
 
 /**
- * ChefCast: Live — web push service worker
+ * Foodilicious — web push service worker
  *
  * Registered by expo-notifications (see `notification.serviceWorkerPath` in
  * app.json). It is responsible for:
@@ -23,7 +23,7 @@ self.addEventListener('push', (event) => {
     // Malformed payload — fall back to defaults below.
   }
 
-  const title = data.title || 'ChefCast: Live';
+  const title = data.title || 'Foodilicious';
   const options = {
     body: data.body || '',
     icon: data.icon || undefined,

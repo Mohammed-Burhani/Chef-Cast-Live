@@ -201,7 +201,7 @@ export default function ProfileScreen() {
           <Text style={[styles.settingsSectionTitle, { color: colors.mutedForeground }]}>ACCOUNT</Text>
           <SettingRow icon="shield" label="Privacy" onPress={() => {}} />
           <SettingRow icon="help-circle" label="Help & Support" onPress={() => {}} />
-          <SettingRow icon="info" label="About ChefCast" value="v1.0.0" onPress={() => {}} />
+          <SettingRow icon="info" label="About Foodilicious" value="v1.0.0" onPress={() => {}} />
           {profile?.role === 'admin' && (
             <SettingRow 
               icon="settings" 

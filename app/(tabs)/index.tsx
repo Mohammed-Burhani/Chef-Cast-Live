@@ -505,7 +505,7 @@ export default function HomeScreen() {
                     contentFit="cover"
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.postUsername, { color: colors.foreground }]}>ChefCast Team</Text>
+                    <Text style={[styles.postUsername, { color: colors.foreground }]}>Foodilicious Team</Text>
                     <Text style={[styles.postTime, { color: colors.mutedForeground }]}>{post.time}</Text>
                   </View>
                 </View>

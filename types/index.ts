@@ -1,5 +1,5 @@
 /**
- * Central TypeScript type definitions for ChefCast: Live.
+ * Central TypeScript type definitions for Foodilicious.
  */
 
 export interface UserProfile {

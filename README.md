@@ -1,4 +1,4 @@
-# ChefCast: Live
+# Foodilicious
 
 > **Watch. Play. Compete.**
 
@@ -6,7 +6,7 @@ A cross-platform mobile companion app for a live cooking television series. Tran
 
 ## 🎯 Overview
 
-ChefCast: Live is built with Expo React Native and Supabase, featuring:
+Foodilicious is built with Expo React Native and Supabase, featuring:
 
 - **Live Quiz Mode** - Real-time trivia during broadcasts with speed bonuses
 - **Competitive Leaderboards** - Global and friends rankings updated live

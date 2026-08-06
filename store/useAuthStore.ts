@@ -15,7 +15,7 @@ interface AuthState {
   updateUser: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
-const STORAGE_KEY_ONBOARDED = "@chefcast:onboarded";
+const STORAGE_KEY_ONBOARDED = "@foodilicious:onboarded";
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
   isOnboarded: false,

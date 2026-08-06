@@ -1,5 +1,5 @@
 /**
- * ChefCast: Live — Push notifications
+ * Foodilicious — Push notifications
  *
  * Everything notification-related lives here:
  *  - Foreground display behaviour (setNotificationHandler)

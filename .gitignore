@@ -34,6 +34,9 @@ bun.lockb
 !.vscode/launch.json
 !.vscode/extensions.json
 
+/supabase/.temp
+/tests
+
 # misc
 /.sass-cache
 /connect.lock

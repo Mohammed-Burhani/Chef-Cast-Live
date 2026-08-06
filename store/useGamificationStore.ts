@@ -52,7 +52,7 @@ interface GamificationState {
   incrementProgress: (field: "episodesParticipated" | "speedBonusCount" | "totalLikes") => Promise<void>;
 }
 
-const STORAGE_KEY = "@chefcast:gamification";
+const STORAGE_KEY = "@foodilicious:gamification";
 
 const getInitialBadges = (): Badge[] =>
   ALL_BADGES.map((b, idx) => ({

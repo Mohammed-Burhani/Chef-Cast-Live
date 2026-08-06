@@ -29,7 +29,7 @@
  * Env secrets (Supabase Dashboard → Edge Functions → notify-episode-live →
  * Secrets):
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE,
- *   EMAIL_FROM (e.g. "ChefCast Live <noreply@chefmarco.com>"),
+ *   EMAIL_FROM (e.g. "Foodilicious <noreply@foodilicious.app>"),
  *   WEB_APP_URL (https://<your-vercel-domain> — used for the "Website" button
  *     and the List-Unsubscribe header),
  *   EXPO_ACCESS_TOKEN (required for web push recipients)
@@ -49,7 +49,7 @@ function createMailSender(getEnv: (key: string) => string | undefined): MailSend
   const host = getEnv('SMTP_HOST');
   if (!host) return undefined;
 
-  const from = getEnv('EMAIL_FROM') ?? 'ChefCast Live <noreply@chefmarco.com>';
+  const from = getEnv('EMAIL_FROM') ?? 'Foodilicious <noreply@foodilicious.app>';
   let transport: nodemailer.Transporter | null = null;
 
   return async ({ to, subject, html, text, headers }) => {

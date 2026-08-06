@@ -19,7 +19,7 @@ WebBrowser.maybeCompleteAuthSession();
 export async function signInWithGoogle() {
   try {
     const redirectUri = makeRedirectUri({
-      scheme: 'chefcast-live',
+      scheme: 'foodilicious',
       path: 'auth/callback',
     });
 
@@ -126,8 +126,8 @@ export async function signInAnonymously() {
 /**
  * Handle deep links opened into the app:
  *  - magic link callbacks
- *  - the go-live email's "View Live in App" button (chefcast-live://episode/<id>)
- *  - the go-live email's unsubscribe link (chefcast-live://email/unsubscribe)
+ *  - the go-live email's "View Live in App" button (foodilicious://episode/<id>)
+ *  - the go-live email's unsubscribe link (foodilicious://email/unsubscribe)
  *
  * expo-router would also resolve these routes on its own; this explicit handling
  * is a safety net so navigation happens even if the router's automatic linking

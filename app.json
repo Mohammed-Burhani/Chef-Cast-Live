@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "ChefCast: Live",
+    "name": "Foodilicious",
     "slug": "foodilicious-live",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "chefcast-live",
+    "scheme": "foodilicious",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/images/icon.png",
@@ -14,10 +14,11 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.chefcast.live"
+      "bundleIdentifier": "com.foodilicious.live"
     },
     "android": {
-      "package": "com.chefcast.live",
+      "package": "com.foodilicious.live",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",

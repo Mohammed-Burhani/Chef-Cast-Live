@@ -88,7 +88,7 @@ interface QuizState {
   loadPastResults: () => Promise<void>;
 }
 
-const STORAGE_KEY = "@chefcast:quizResults";
+const STORAGE_KEY = "@foodilicious:quizResults";
 
 /** Calculate points for a correct answer based on response speed */
 function calcPoints(base: number, totalSeconds: number, remainingSeconds: number): number {

@@ -233,7 +233,7 @@ export default function LoginScreen() {
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-              New to ChefCast?{" "}
+              New to Foodilicious?{" "}
             </Text>
             <TouchableOpacity onPress={() => router.replace("/(auth)/signup")}>
               <Text style={[styles.footerLink, { color: colors.primary }]}>Sign up</Text>

@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "chefcast-live",
+      "name": "foodilicious",
       "dependencies": {
         "@expo-google-fonts/inter": "^0.4.0",
         "@expo-google-fonts/poppins": "^0.4.1",
@@ -15,7 +15,6 @@
         "expo": "^56.0.9",
         "expo-apple-authentication": "~56.0.4",
         "expo-auth-session": "~56.0.13",
-        "expo-av": "^16.0.8",
         "expo-blur": "~56.0.3",
         "expo-camera": "~56.0.7",
         "expo-constants": "~56.0.17",
@@ -846,8 +845,6 @@
     "expo-asset": ["expo-asset@56.0.16", "", { "dependencies": { "@expo/image-utils": "^0.10.1", "expo-constants": "~56.0.17" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-iIxPo6C6+/d8JxGV74ZKZbIcCz2s8//dVl7oBAj124NcPMFhzdwycFBpMqq5LUxin+lVy5cCoEjv2LD8ulnkiQ=="],
 
     "expo-auth-session": ["expo-auth-session@56.0.13", "", { "dependencies": { "expo-application": "~56.0.3", "expo-constants": "~56.0.16", "expo-crypto": "~56.0.4", "expo-linking": "~56.0.13", "expo-web-browser": "~56.0.5", "invariant": "^2.2.4" }, "peerDependencies": { "react": "*", "react-native": "*" } }, "sha512-LR8Suq8BHKRFBUcAKTMmZufCcDcr0sQa8rIYit1r7kshrqAy9glIUU4aqHt8tflW/ISN0x1vU+HU8AQaackM0A=="],
-
-    "expo-av": ["expo-av@16.0.8", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*", "react-native-web": "*" }, "optionalPeers": ["react-native-web"] }, "sha512-cmVPftGR/ca7XBgs7R6ky36lF3OC0/MM/lpgX/yXqfv0jASTsh7AYX9JxHCwFmF+Z6JEB1vne9FDx4GiLcGreQ=="],
 
     "expo-blur": ["expo-blur@56.0.3", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-KDDtrpWc2tYlm1WCPaOgBtv+YEGqe5ELheFPIgSNgHt28NQUDcfBcFsA9Us2StDh6osmSD6NbKxOt5bU6PcDbQ=="],
 

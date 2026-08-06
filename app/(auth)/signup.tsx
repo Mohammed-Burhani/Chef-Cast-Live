@@ -169,7 +169,7 @@ export default function SignupScreen() {
             <View style={[styles.logoCircle, { backgroundColor: colors.neonRed }]}>
               <Feather name="zap" size={28} color="#fff" />
             </View>
-            <Text style={[styles.appName, { color: colors.foreground }]}>ChefCast</Text>
+            <Text style={[styles.appName, { color: colors.foreground }]}>Foodilicious</Text>
             <Text style={[styles.appTagline, { color: colors.neonRed }]}>LIVE</Text>
           </View>
 

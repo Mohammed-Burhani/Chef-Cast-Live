@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "283402852041",
+    "project_id": "foodilicious-a14d0",
+    "storage_bucket": "foodilicious-a14d0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283402852041:android:a4d7d3fb0f50c805e59f18",
+        "android_client_info": {
+          "package_name": "com.foodilicious.live"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSBJESCjJPzwhZE1xud8smKXcxbDqbudo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

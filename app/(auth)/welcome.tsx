@@ -88,7 +88,7 @@ export default function WelcomeScreen() {
       const { login } = useAuthStore.getState();
       await login({
         id: `guest-${Date.now()}`,
-        email: "guest@chefcast.live",
+        email: "guest@foodilicious.app",
         username: "Guest User",
         avatar: null,
         xpTotal: 0,
@@ -125,7 +125,7 @@ export default function WelcomeScreen() {
           <View style={[styles.logoCircle, { backgroundColor: colors.neonRed }]}>
             <Feather name="zap" size={28} color="#fff" />
           </View>
-          <Text style={[styles.appName, { color: colors.foreground }]}>ChefCast</Text>
+          <Text style={[styles.appName, { color: colors.foreground }]}>Foodilicious</Text>
           <Text style={[styles.appTagline, { color: colors.neonRed }]}>LIVE</Text>
         </View>
 

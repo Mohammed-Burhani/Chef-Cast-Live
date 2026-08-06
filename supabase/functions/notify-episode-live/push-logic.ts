@@ -195,7 +195,7 @@ export function buildLiveEmail(
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#1A1A1A;border-radius:16px;">
             <tr>
               <td style="padding:32px 32px 16px;text-align:center;">
-                <p style="margin:0;color:#FFB347;font-size:14px;font-weight:bold;letter-spacing:1px;">CHEFCAST: LIVE</p>
+                <p style="margin:0;color:#FFB347;font-size:14px;font-weight:bold;letter-spacing:1px;">FOODILICIOUS</p>
                 <h1 style="margin:12px 0 0;color:#FFFFFF;font-size:26px;line-height:1.3;">It&rsquo;s live! 🍳</h1>
                 <h2 style="margin:8px 0 0;color:#FFB347;font-size:22px;line-height:1.3;">${title}</h2>
               </td>
@@ -215,7 +215,7 @@ export function buildLiveEmail(
             </tr>
             <tr>
               <td style="padding:28px 32px 32px;text-align:center;color:#8A8A8A;font-size:12px;line-height:1.6;">
-                You&rsquo;re receiving this because you subscribe to ChefCast live alerts.<br />
+                You&rsquo;re receiving this because you subscribe to Foodilicious live alerts.<br />
                 <a href="${links.unsubscribeUrl}" style="color:#AAAAAA;text-decoration:underline;">Unsubscribe from live episode emails</a>
               </td>
             </tr>
@@ -374,9 +374,9 @@ async function sendEpisodeLiveEmails(deps: HandlerDeps, episode: EpisodeRow): Pr
         thumbnail_url: episode.thumbnail_url,
       },
       {
-        appDeepLink: `chefcast-live://episode/${episode.id}`,
+        appDeepLink: `foodilicious://episode/${episode.id}`,
         webUrl: `${webUrl}/episode/${episode.id}`,
-        unsubscribeUrl: 'chefcast-live://email/unsubscribe',
+        unsubscribeUrl: 'foodilicious://email/unsubscribe',
       },
     );
 

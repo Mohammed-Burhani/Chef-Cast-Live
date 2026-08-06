@@ -1,5 +1,5 @@
 /**
- * Badge definitions for the ChefCast: Live gamification system.
+ * Badge definitions for the Foodilicious gamification system.
  * Each badge has a slug, name, description, icon, XP reward, and unlock criteria.
  * Based on v2.0 specification.
  */
