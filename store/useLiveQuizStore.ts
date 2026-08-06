@@ -34,6 +34,8 @@ export interface UserAnswer {
   isCorrect: boolean;
   pointsEarned: number;
   responseTimeMs: number;
+  /** Live provisional rank among correct answers at submit time (null until close). */
+  position?: number | null;
 }
 
 interface LiveQuizState {

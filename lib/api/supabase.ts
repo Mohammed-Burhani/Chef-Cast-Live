@@ -231,6 +231,29 @@ export async function uploadDishPhoto(params: {
   return data as DishPhoto;
 }
 
+/**
+ * Upload a local image (from the picker) to the dish-photos bucket and return
+ * its public URL. Used when a community post's image is a local file/blob URI
+ * rather than a remote URL.
+ */
+export async function uploadLocalDishPhoto(localUri: string): Promise<string> {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session.session) throw new Error('Not authenticated');
+
+  const extMatch = /\.(\w{2,5})(\?|$)/.exec(localUri);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'jpg';
+  const path = `${session.session.user.id}/${Date.now()}.${ext}`;
+
+  const blob = await (await fetch(localUri)).blob();
+  const { error } = await supabase.storage
+    .from('dish-photos')
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from('dish-photos').getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function toggleLikeDishPhoto(photoId: string) {
   const { data: session } = await supabase.auth.getSession();
   if (!session.session) throw new Error('Not authenticated');

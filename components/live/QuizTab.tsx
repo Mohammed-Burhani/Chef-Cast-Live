@@ -184,7 +184,8 @@ export function QuizTab({ episodeId }: QuizTabProps) {
         questionId: currentQuestion.id,
         selectedOption: optionKey,
         isCorrect: result.isCorrect,
-        pointsEarned: result.pointsEarned || 0,
+        pointsEarned: 0,
+        position: result.position ?? null,
         responseTimeMs,
       });
     } catch (err) {
@@ -194,6 +195,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
         selectedOption: optionKey,
         isCorrect: false,
         pointsEarned: 0,
+        position: null,
         responseTimeMs,
       });
     }
@@ -218,6 +220,10 @@ export function QuizTab({ episodeId }: QuizTabProps) {
 
   // Last answer info (for revealing phase) — used for the earned points display
   const lastAnswer = useLiveQuizStore((s) => s.userAnswers[s.userAnswers.length - 1]);
+
+  // Authoritative scored answer row from the DB. At reveal time (after
+  // close-question has scored it) this carries the real total_points + rank.
+  const { data: scoredAnswer } = useUserAnswer(episodeId, currentQuestion?.id ?? null);
 
   // The option the user locked in for the current question.
   const effectiveSelection = localSelectedOption ?? selectedOption;
@@ -371,7 +377,9 @@ export function QuizTab({ episodeId }: QuizTabProps) {
   // ============================================================================
   if (!currentQuestion) return null;
 
-  const pointsEarned = lastAnswer?.pointsEarned ?? 0;
+  // Real points/rank come from the scored answer row after the question closes.
+  const pointsEarned = scoredAnswer?.total_points ?? lastAnswer?.pointsEarned ?? 0;
+  const earnedRank = scoredAnswer?.rank ?? null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -403,6 +411,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
                 {wasCorrect && (
                   <Text style={[styles.resultSubtitle, { color: colors.mutedForeground }]}>
                     +{pointsEarned.toLocaleString()} pts earned
+                    {earnedRank != null ? ` · Rank #${earnedRank}` : ""}
                   </Text>
                 )}
               </View>
@@ -475,17 +484,25 @@ export function QuizTab({ episodeId }: QuizTabProps) {
         {(localSelectedOption ?? selectedOption) && phase === 'question' && (
           <View style={[styles.lockedBox, { backgroundColor: `${colors.primary}15`, borderColor: colors.primary }]}>
             <Feather name="lock" size={14} color={colors.primary} />
-            <Text style={[styles.lockedText, { color: colors.primary }]}>
-              Answer locked! Waiting for timer...
-            </Text>
+            <View style={styles.lockedInfo}>
+              <Text style={[styles.lockedText, { color: colors.primary }]}>
+                Answer locked! Waiting for timer...
+              </Text>
+              {lastAnswer?.isCorrect && lastAnswer?.position != null && (
+                <Text style={[styles.lockedSubtext, { color: colors.primary }]}>
+                  {lastAnswer.position === 1
+                    ? "🏆 You're #1 so far!"
+                    : `You're #${lastAnswer.position} so far`}
+                </Text>
+              )}
+            </View>
           </View>
         )}
 
-        {/* NOTE: Score / rank intentionally NOT shown during the question phase.
-            The score-answer edge function scores immediately and pushes a
-            LEADERBOARD_UPDATED realtime event, so totalScore/viewerRank update
-            while the timer is still running. We hold back the reveal so the
-            user only sees score + rank once the timer ends (revealing phase). */}
+        {/* NOTE: Final score + rank only appear in the revealing phase. Points
+            are position-based (20/15/10/5/0) and are finalized by
+            score_question() when the question closes, so the reveal reads the
+            authoritative scored answer row. */}
 
         {/* Stats + Top 3 (revealing phase) */}
         {phase === 'revealing' && (
@@ -567,7 +584,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     padding: 14, borderRadius: 14, borderWidth: 1.5,
   },
-  lockedText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  lockedInfo: { flex: 1, gap: 2 },
+  lockedText: { fontSize: 14, fontWeight: '600' },
+  lockedSubtext: { fontSize: 12, fontWeight: '500' },
 
   // Revealing
   resultBanner: {

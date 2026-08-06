@@ -126,36 +126,38 @@ serve(async (req) => {
     const correctOption = question.correct_option;
     const timerSeconds = question.timer_seconds;
 
-    // Fetch all answers for this question that may need scoring
-    const { data: answers, error: answersError } = await supabase
-      .from('answers')
-      .select('*')
-      .eq('question_id', questionId)
-      .eq('episode_id', episodeId);
-
-    if (answersError) throw answersError;
-
-    // Recalculate ranks for this episode
-    const { error: rankError } = await supabase.rpc('recalculate_episode_ranks', {
-      p_episode_id: episodeId,
+    // Finalize this question's scoring: assign per-question ranks (fastest
+    // correct = #1) and points (20/15/10/5/0), roll totals into episode_scores
+    // and profiles.xp, and refresh episode ranks. score_question is idempotent,
+    // so racing duplicate close calls are safe.
+    const { error: scoreError } = await supabase.rpc('score_question', {
+      p_question_id: questionId,
     });
 
-    // If the RPC doesn't exist, fall back to client-side rank update
-    if (rankError) {
-      console.error('Rank recalculation RPC failed, using fallback:', rankError.message);
+    if (scoreError) {
+      console.error('score_question RPC failed, falling back to rank recalc:', scoreError.message);
 
-      const { data: scores } = await supabase
-        .from('episode_scores')
-        .select('id, total_score, user_id')
-        .eq('episode_id', episodeId)
-        .order('total_score', { ascending: false });
+      // Fallback: keep episode ranks correct even if the scoring RPC is unavailable
+      const { error: rankError } = await supabase.rpc('recalculate_episode_ranks', {
+        p_episode_id: episodeId,
+      });
 
-      if (scores) {
-        for (let i = 0; i < scores.length; i++) {
-          await supabase
-            .from('episode_scores')
-            .update({ rank: i + 1 })
-            .eq('id', scores[i].id);
+      if (rankError) {
+        console.error('Rank recalculation RPC failed, using client-side fallback:', rankError.message);
+
+        const { data: scores } = await supabase
+          .from('episode_scores')
+          .select('id, total_score, user_id')
+          .eq('episode_id', episodeId)
+          .order('total_score', { ascending: false });
+
+        if (scores) {
+          for (let i = 0; i < scores.length; i++) {
+            await supabase
+              .from('episode_scores')
+              .update({ rank: i + 1 })
+              .eq('id', scores[i].id);
+          }
         }
       }
     }

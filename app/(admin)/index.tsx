@@ -53,6 +53,12 @@ export default function AdminDashboard() {
           label="Community Posts"
           iconColor={colors.neonRed}
         />
+        <StatCard
+          icon="book-open"
+          value={stats?.publishedRecipes ?? stats?.totalRecipes ?? 0}
+          label="Published Recipes"
+          iconColor={colors.primary}
+        />
       </View>
 
       {/* Quick Actions */}
@@ -75,6 +81,15 @@ export default function AdminDashboard() {
           >
             <Feather name="radio" size={28} color="#fff" />
             <Text style={styles.actionLabel}>Live Control</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: colors.neonRed }]}
+            onPress={() => router.push('/(admin)/recipes' as any)}
+            activeOpacity={0.8}
+          >
+            <Feather name="book-open" size={28} color="#fff" />
+            <Text style={styles.actionLabel}>Manage Recipes</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

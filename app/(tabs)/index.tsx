@@ -29,8 +29,9 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
 import { useEpisodeStore } from "@/store/episodeStore";
-import { useLiveEpisode, useEpisodes, useDishPhotos, keys } from "@/lib/api/hooks";
+import { useLiveEpisode, useEpisodes, useDishPhotos, useRecipes, keys } from "@/lib/api/hooks";
 import { useUpcomingEpisodes, liveKeys } from "@/lib/api/live";
+import { useUserStats } from "@/lib/api/scoring";
 import { useEpisodeFeedEvents } from "@/lib/realtime/hooks";
 import { buildUpcomingRail } from "@/lib/home/upcomingRail";
 
@@ -149,7 +150,9 @@ export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
-  const { xpTotal = 0, currentStreak = 0, badges = [] } = useGamificationStore();
+  const { currentStreak = 0, badges = [] } = useGamificationStore();
+  const { data: stats } = useUserStats(user?.id);
+  const xpTotal = stats?.xp ?? 0;
   const showPoll = usePollStore((s) => s.showPoll);
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
   const queryClient = useQueryClient();
@@ -184,7 +187,9 @@ export default function HomeScreen() {
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
   const { data: dishPhotos = [] } = useDishPhotos();
   const { data: soonLive } = useUpcomingEpisodes();
+  const { data: recipes = [] } = useRecipes();
   const railEpisodes = buildUpcomingRail(soonLive, transitionedLiveIds);
+  const topRecipes = recipes.slice(0, 8);
 
   // Keep remindersRef in sync with the latest upcoming data.
   React.useEffect(() => {
@@ -195,19 +200,12 @@ export default function HomeScreen() {
 
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const now = new Date();
-  const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-
   // Past = only episodes explicitly ended by admin
   const pastEpisodes = episodes.filter((e) => e.ended_at).slice(0, 3);
 
   // Upcoming = not live, not ended (regardless of whether scheduled_at is in the past)
   const episodesNotEnded = episodes.filter((e) => !e.is_live && !e.ended_at);
 
-  // "Future" = scheduled more than 1 hour away
-  const futureEpisodes = episodesNotEnded.filter((e) => {
-    return new Date(e.scheduled_at) > oneHourFromNow;
-  });
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
 
   const getGreeting = () => {
@@ -419,39 +417,84 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
-            >
-              {(episodeTab === 'upcoming' ? futureEpisodes : pastEpisodes).map((ep) => (
-                <EpisodeCard key={ep.id} episode={ep} compact />
-              ))}
-            </ScrollView>
+            {episodeTab === 'upcoming' ? (
+              episodesNotEnded.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScroll}
+                >
+                  {episodesNotEnded.map((ep) => (
+                    <EpisodeCard key={ep.id} episode={ep} compact />
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.episodeEmpty}>
+                  <Feather name="calendar" size={32} color={colors.mutedForeground} />
+                  <Text style={[styles.episodeEmptyText, { color: colors.mutedForeground }]}>
+                    No upcoming episodes yet. Check back soon!
+                  </Text>
+                </View>
+              )
+            ) : pastEpisodes.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalScroll}
+              >
+                {pastEpisodes.map((ep) => (
+                  <EpisodeCard key={ep.id} episode={ep} compact />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.episodeEmpty}>
+                <Feather name="check-circle" size={32} color={colors.mutedForeground} />
+                <Text style={[styles.episodeEmptyText, { color: colors.mutedForeground }]}>
+                  No past episodes yet. Check back soon!
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
-        {/* Recipes (Prototype) */}
+        {/* Top Recipes */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top Recipes</Text>
-            <TouchableOpacity><Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/recipes" as never)}>
+              <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+            </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-            {[
-              { id: 1, title: 'Saffron Risotto', chef: 'Chef Marco', img: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400' },
-              { id: 2, title: 'Duck with Cherry Glaze', chef: 'Chef Sophie', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400' },
-              { id: 3, title: 'French Onion Soup', chef: 'Chef Jean-Pierre', img: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400' },
-            ].map((recipe) => (
-              <TouchableOpacity key={recipe.id} style={[{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }]} activeOpacity={0.85}>
-                <Image source={{ uri: recipe.img }} style={{ width: 160, height: 120 }} contentFit="cover" />
-                <View style={{ padding: 10, gap: 4 }}>
-                  <Text style={[{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }]} numberOfLines={2}>{recipe.title}</Text>
-                  <Text style={[{ fontSize: 11, color: colors.mutedForeground }]} numberOfLines={1}>by {recipe.chef}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {topRecipes.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {topRecipes.map((recipe) => (
+                <TouchableOpacity
+                  key={recipe.id}
+                  style={{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/recipe/${recipe.id}` as never)}
+                >
+                  {recipe.image_url ? (
+                    <Image source={{ uri: recipe.image_url }} style={{ width: 160, height: 120 }} contentFit="cover" />
+                  ) : (
+                    <View style={{ width: 160, height: 120, backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="book-open" size={32} color={colors.mutedForeground} />
+                    </View>
+                  )}
+                  <View style={{ padding: 10, gap: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }} numberOfLines={2}>{recipe.title}</Text>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
+                      {recipe.author_name ? `by ${recipe.author_name}` : 'Foodilicious'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={{ fontSize: 13, color: colors.mutedForeground }}>
+              No recipes published yet. Check back soon!
+            </Text>
+          )}
         </View>
 
         {/* Top Scorer of the Week */}
@@ -604,6 +647,8 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 18, fontWeight: "700" },
   seeAll: { fontSize: 14, fontWeight: "600" },
+  episodeEmpty: { alignItems: "center", justifyContent: "center", paddingVertical: 28, gap: 10 },
+  episodeEmptyText: { fontSize: 14, textAlign: "center", paddingHorizontal: 24 },
   liveBanner: { borderRadius: 20, padding: 16, borderWidth: 2, gap: 14 },
   liveBannerHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   liveBannerTitle: { fontSize: 13, fontWeight: "700", letterSpacing: 0.5 },

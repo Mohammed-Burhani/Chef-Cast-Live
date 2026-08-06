@@ -220,6 +220,7 @@ export interface Database {
           base_points: number
           speed_bonus: number
           total_points: number
+          rank: number | null
           created_at: string
         }
         Insert: {
@@ -234,6 +235,7 @@ export interface Database {
           base_points: number
           speed_bonus: number
           total_points: number
+          rank?: number | null
           created_at?: string
         }
         Update: {
@@ -248,6 +250,7 @@ export interface Database {
           base_points?: number
           speed_bonus?: number
           total_points?: number
+          rank?: number | null
           created_at?: string
         }
         Relationships: [
@@ -460,6 +463,131 @@ export interface Database {
             referencedColumns: ["id"]
           }
         ]
+      }
+      post_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          text: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          text: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          text?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            referencedRelation: "dish_photos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_comments_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      post_comment_likes: {
+        Row: {
+          id: string
+          comment_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          comment_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          comment_id?: string
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_comment_likes_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      recipes: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          image_url: string | null
+          author_name: string | null
+          difficulty: 'easy' | 'medium' | 'hard'
+          prep_time_minutes: number
+          cook_time_minutes: number
+          servings: number
+          ingredients: Json
+          steps: Json
+          nutrition: Json
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          image_url?: string | null
+          author_name?: string | null
+          difficulty?: 'easy' | 'medium' | 'hard'
+          prep_time_minutes?: number
+          cook_time_minutes?: number
+          servings?: number
+          ingredients?: Json
+          steps?: Json
+          nutrition?: Json
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          image_url?: string | null
+          author_name?: string | null
+          difficulty?: 'easy' | 'medium' | 'hard'
+          prep_time_minutes?: number
+          cook_time_minutes?: number
+          servings?: number
+          ingredients?: Json
+          steps?: Json
+          nutrition?: Json
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       follows: {
         Row: {

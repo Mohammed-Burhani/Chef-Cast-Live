@@ -75,6 +75,11 @@ function isRecentId(id: string): boolean {
   return recentCommentIds.has(id);
 }
 
+// Tracks the NEW_COMMENT handler registered on the channel manager so it can be
+// removed on unsubscribe. Without this, re-subscribing on tab re-mounts would
+// accumulate handlers (memory leak; duplicates masked only by recentCommentIds).
+let commentHandlerUnsubscribe: (() => void) | null = null;
+
 export const useCommentStore = create<CommentState>()((set, get) => ({
   comments: [],
   isLoading: false,
@@ -257,8 +262,14 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
     // Subscribe to the comments channel via the channel manager
     channelManager.subscribeToComments(episodeId);
 
+    // Clear any stale handler left over from a previous subscription
+    if (commentHandlerUnsubscribe) {
+      commentHandlerUnsubscribe();
+      commentHandlerUnsubscribe = null;
+    }
+
     // Register event handler for incoming comments
-    channelManager.on('NEW_COMMENT', (event: CommentEvent) => {
+    commentHandlerUnsubscribe = channelManager.on('NEW_COMMENT', (event: CommentEvent) => {
       if (event.episodeId !== episodeId) return;
 
       // Skip if we already have this comment (optimistic add or DB load)
@@ -284,6 +295,11 @@ export const useCommentStore = create<CommentState>()((set, get) => ({
    * Unsubscribe from comments for an episode
    */
   unsubscribeFromComments: (episodeId: string) => {
+    // Remove the NEW_COMMENT handler so it doesn't leak across re-subscribes
+    if (commentHandlerUnsubscribe) {
+      commentHandlerUnsubscribe();
+      commentHandlerUnsubscribe = null;
+    }
     channelManager.unsubscribeFromComments(episodeId);
     set({ commentSubscriptionActive: false });
   },

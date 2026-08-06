@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { VideoPlayer } from "@/components/live/VideoPlayer";
 import { TabBar } from "@/components/live/TabBar";
@@ -25,7 +25,8 @@ import { QuizTab } from "@/components/live/QuizTab";
 import { CommentsTab } from "@/components/live/CommentsTab";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { useColors } from "@/hooks/useColors";
-import { useLiveSession, useJoinLiveSession, fetchActiveQuestion } from "@/lib/api/live";
+import { useLiveSession, useJoinLiveSession, fetchActiveQuestion, liveKeys } from "@/lib/api/live";
+import { scoringKeys } from "@/lib/api/scoring";
 import { useLiveQuizStore } from "@/store/useLiveQuizStore";
 import { useRealtimeStore } from "@/store/realtimeStore";
 import { useEpisodeChannel, useQuestionEvents, useLeaderboardEvents, useQuestionDismissedEvent } from "@/lib/realtime/hooks";
@@ -64,6 +65,7 @@ export default function LiveSessionScreen() {
   const updateScore = useLiveQuizStore((s) => s.updateScore);
   const reset = useLiveQuizStore((s) => s.reset);
   const phase = useLiveQuizStore((s) => s.phase);
+  const queryClient = useQueryClient();
 
   // Connect to the episode channel on mount
   useEpisodeChannel(episodeId);
@@ -97,7 +99,15 @@ export default function LiveSessionScreen() {
 
     onClosed: useCallback((event) => {
       handleQuestionClosed(event.correctOption, event.questionId);
-    }, [handleQuestionClosed]),
+      // The question has now been scored server-side (score_question), so the
+      // authoritative answer row (total_points + rank) is ready — refetch it so
+      // the revealing phase shows the real position-based points.
+      queryClient.invalidateQueries({
+        queryKey: liveKeys.userAnswer(episodeId, event.questionId),
+      });
+      // Fresh overall score for Home / Pantry after this question's points land.
+      queryClient.invalidateQueries({ queryKey: scoringKeys.all });
+    }, [episodeId, handleQuestionClosed, queryClient]),
   });
 
   // Handle question dismissed — transitions from revealing → between/complete

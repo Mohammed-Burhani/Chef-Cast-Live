@@ -45,6 +45,9 @@ class ChannelManager {
   // (postgres_changes on quiz_events) paths from emitting the same event twice.
   private processedActivationKeys = new Set<string>();
   private processedCloseKeys = new Set<string>();
+  // Coalesces the burst of episode_scores changes fired at question close into
+  // a single leaderboard refresh (keyed by `leaderboard:${episodeId}:${userId}`).
+  private leaderboardDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Reconnection config
   private readonly INITIAL_DELAY = 1000;
@@ -599,11 +602,34 @@ class ChannelManager {
     }
   }
 
-  private async handleLeaderboardChange(
-    payload: any,
+  /**
+   * Handle postgres_changes on episode_scores (leaderboard updates).
+   *
+   * Debounced per (episode, viewer): at question close, score_question()
+   * touches every participant's row at once, which can fire tens of thousands
+   * of realtime events. Coalescing them into a single refresh keeps the client
+   * efficient at ~30k participants.
+   */
+  private handleLeaderboardChange(
+    _payload: any,
     episodeId: string,
     userId: string
-  ): Promise<void> {
+  ): void {
+    const key = `leaderboard:${episodeId}:${userId}`;
+    const existing = this.leaderboardDebounceTimers.get(key);
+    if (existing) {
+      clearTimeout(existing);
+    }
+    this.leaderboardDebounceTimers.set(
+      key,
+      setTimeout(() => {
+        this.leaderboardDebounceTimers.delete(key);
+        this.refreshLeaderboard(episodeId, userId);
+      }, 800)
+    );
+  }
+
+  private async refreshLeaderboard(episodeId: string, userId: string): Promise<void> {
     // Fetch top 10 + viewer entry
     const { data: topTen } = await supabase
       .from('episode_scores')

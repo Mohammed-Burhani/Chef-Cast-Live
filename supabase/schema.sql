@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS answers (
   base_points INTEGER NOT NULL,
   speed_bonus INTEGER NOT NULL,
   total_points INTEGER NOT NULL,
+  rank INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   UNIQUE(user_id, question_id)
 );
@@ -128,6 +129,43 @@ CREATE TABLE IF NOT EXISTS dish_photo_likes (
   photo_id UUID NOT NULL REFERENCES dish_photos(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   UNIQUE(user_id, photo_id)
+);
+
+-- Post Comments: Comments on community posts (dish_photos)
+CREATE TABLE IF NOT EXISTS post_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id UUID NOT NULL REFERENCES dish_photos(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  text TEXT NOT NULL CHECK (length(text) BETWEEN 1 AND 500),
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- Post Comment Likes: Likes on post comments
+CREATE TABLE IF NOT EXISTS post_comment_likes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id UUID NOT NULL REFERENCES post_comments(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(comment_id, user_id)
+);
+
+-- Recipes: Admin-published blog-style recipes with full recipe structure
+CREATE TABLE IF NOT EXISTS recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  author_name TEXT,
+  difficulty TEXT DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  prep_time_minutes INTEGER DEFAULT 0 NOT NULL,
+  cook_time_minutes INTEGER DEFAULT 0 NOT NULL,
+  servings INTEGER DEFAULT 4 NOT NULL,
+  ingredients JSONB DEFAULT '[]'::jsonb NOT NULL,
+  steps JSONB DEFAULT '[]'::jsonb NOT NULL,
+  nutrition JSONB DEFAULT '{}'::jsonb NOT NULL,
+  is_published BOOLEAN DEFAULT true NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Follows: User follow relationships
@@ -194,6 +232,7 @@ CREATE INDEX IF NOT EXISTS idx_questions_episode_id ON questions(episode_id);
 CREATE INDEX IF NOT EXISTS idx_questions_is_active ON questions(is_active);
 CREATE INDEX IF NOT EXISTS idx_answers_user_id ON answers(user_id);
 CREATE INDEX IF NOT EXISTS idx_answers_question_id ON answers(question_id);
+CREATE INDEX IF NOT EXISTS idx_answers_question_rank ON answers(question_id, is_correct, response_time_ms);
 CREATE INDEX IF NOT EXISTS idx_answers_episode_id ON answers(episode_id);
 CREATE INDEX IF NOT EXISTS idx_episode_scores_episode_id ON episode_scores(episode_id);
 CREATE INDEX IF NOT EXISTS idx_episode_scores_rank ON episode_scores(rank);
@@ -222,6 +261,9 @@ ALTER TABLE dish_photo_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE push_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_comment_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recipes ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
 DROP POLICY IF EXISTS "Users can view all profiles" ON profiles;
@@ -314,6 +356,43 @@ CREATE POLICY "Users can view all comments" ON comments FOR SELECT TO authentica
 
 DROP POLICY IF EXISTS "Users can insert own comments" ON comments;
 CREATE POLICY "Users can insert own comments" ON comments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- Post Comments policies
+DROP POLICY IF EXISTS "Users can view all post comments" ON post_comments;
+CREATE POLICY "Users can view all post comments" ON post_comments FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Users can insert own post comments" ON post_comments;
+CREATE POLICY "Users can insert own post comments" ON post_comments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own post comments" ON post_comments;
+CREATE POLICY "Users can delete own post comments" ON post_comments FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+-- Post Comment Likes policies
+DROP POLICY IF EXISTS "Users can view all post comment likes" ON post_comment_likes;
+CREATE POLICY "Users can view all post comment likes" ON post_comment_likes FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Users can insert own post comment likes" ON post_comment_likes;
+CREATE POLICY "Users can insert own post comment likes" ON post_comment_likes FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete own post comment likes" ON post_comment_likes;
+CREATE POLICY "Users can delete own post comment likes" ON post_comment_likes FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+-- Recipes policies (admin write, like episodes)
+DROP POLICY IF EXISTS "Authenticated users can view recipes" ON recipes;
+CREATE POLICY "Authenticated users can view recipes" ON recipes FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Admins can insert recipes" ON recipes;
+CREATE POLICY "Admins can insert recipes" ON recipes FOR INSERT TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can update recipes" ON recipes;
+CREATE POLICY "Admins can update recipes" ON recipes FOR UPDATE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true))
+  WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true));
+
+DROP POLICY IF EXISTS "Admins can delete recipes" ON recipes;
+CREATE POLICY "Admins can delete recipes" ON recipes FOR DELETE TO authenticated
+  USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_admin = true));
 
 -- ============================================================================
 -- STORAGE POLICIES
@@ -524,6 +603,110 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Score one question with position-based points (rank 1 = 20, 2 = 15, 3 = 10, 4+ = 5, wrong = 0).
+-- Runs at question close in a single set-based pass; idempotent.
+CREATE OR REPLACE FUNCTION public.score_question(p_question_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_episode_id UUID;
+  v_scored     INTEGER;
+BEGIN
+  SELECT episode_id INTO v_episode_id
+  FROM questions
+  WHERE id = p_question_id;
+
+  IF v_episode_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  WITH ranked AS (
+    SELECT
+      a.id,
+      ROW_NUMBER() OVER (
+        ORDER BY a.response_time_ms ASC, a.answered_at ASC, a.id ASC
+      ) AS q_rank
+    FROM answers a
+    WHERE a.question_id = p_question_id
+      AND a.is_correct = true
+      AND a.rank IS NULL
+      AND a.answered_at <= (
+        SELECT closed_at FROM questions WHERE id = p_question_id
+      )
+  )
+  UPDATE answers a
+  SET rank = r.q_rank,
+      total_points = CASE
+        WHEN r.q_rank = 1 THEN 20
+        WHEN r.q_rank = 2 THEN 15
+        WHEN r.q_rank = 3 THEN 10
+        ELSE 5
+      END
+  FROM ranked r
+  WHERE a.id = r.id;
+
+  GET DIAGNOSTICS v_scored = ROW_COUNT;
+
+  IF v_scored = 0 THEN
+    PERFORM public.recalculate_episode_ranks(v_episode_id);
+    RETURN;
+  END IF;
+
+  -- Add just-scored points to episode totals (correct_count handled by trigger)
+  UPDATE episode_scores es
+  SET total_score = es.total_score + sub.points
+  FROM (
+    SELECT user_id, SUM(total_points) AS points
+    FROM answers
+    WHERE question_id = p_question_id
+      AND total_points > 0
+    GROUP BY user_id
+  ) sub
+  WHERE es.user_id = sub.user_id
+    AND es.episode_id = v_episode_id;
+
+  -- Roll this question's points into lifetime XP / correct totals
+  UPDATE profiles p
+  SET xp = p.xp + sub.points,
+      total_correct = p.total_correct + sub.correct
+  FROM (
+    SELECT user_id,
+           SUM(total_points) AS points,
+           COUNT(*) AS correct
+    FROM answers
+    WHERE question_id = p_question_id
+      AND total_points > 0
+    GROUP BY user_id
+  ) sub
+  WHERE p.id = sub.user_id;
+
+  PERFORM public.recalculate_episode_ranks(v_episode_id);
+END;
+$$;
+
+-- Track episodes_participated as users join new events
+CREATE OR REPLACE FUNCTION public.track_episode_participation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE profiles
+  SET episodes_participated = episodes_participated + 1
+  WHERE id = NEW.user_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_episode_score_created ON episode_scores;
+CREATE TRIGGER on_episode_score_created
+  AFTER INSERT ON episode_scores
+  FOR EACH ROW EXECUTE FUNCTION public.track_episode_participation();
+
 -- Auto-live episodes: transitions scheduled episodes to live when their time comes
 CREATE OR REPLACE FUNCTION public.auto_live_episodes()
 RETURNS SETOF episodes AS $$
@@ -541,6 +724,88 @@ BEGIN
   RETURNING *;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Auto-bump recipes.updated_at on update
+CREATE OR REPLACE FUNCTION public.set_recipes_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_recipes_updated_at ON recipes;
+CREATE TRIGGER set_recipes_updated_at
+  BEFORE UPDATE ON recipes
+  FOR EACH ROW EXECUTE FUNCTION public.set_recipes_updated_at();
+
+-- Load post comments with author profile, like count, and liked state (single call)
+CREATE OR REPLACE FUNCTION public.get_post_comments(p_post_id UUID)
+RETURNS TABLE (
+  id UUID,
+  post_id UUID,
+  user_id UUID,
+  text TEXT,
+  created_at TIMESTAMPTZ,
+  username TEXT,
+  avatar_url TEXT,
+  like_count BIGINT,
+  is_liked BOOLEAN
+)
+LANGUAGE sql
+SECURITY INVOKER
+AS $$
+  SELECT
+    c.id,
+    c.post_id,
+    c.user_id,
+    c.text,
+    c.created_at,
+    p.username,
+    p.avatar_url,
+    (SELECT count(*) FROM post_comment_likes l WHERE l.comment_id = c.id) AS like_count,
+    EXISTS (
+      SELECT 1 FROM post_comment_likes l2
+      WHERE l2.comment_id = c.id AND l2.user_id = auth.uid()
+    ) AS is_liked
+  FROM post_comments c
+  JOIN profiles p ON p.id = c.user_id
+  WHERE c.post_id = p_post_id
+  ORDER BY c.created_at DESC;
+$$;
+
+-- Atomically toggle the current user's like on a comment; returns the new count
+CREATE OR REPLACE FUNCTION public.toggle_post_comment_like(p_comment_id UUID)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+AS $$
+DECLARE
+  v_user UUID := auth.uid();
+  v_new_count INTEGER;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM post_comment_likes
+    WHERE comment_id = p_comment_id AND user_id = v_user
+  ) THEN
+    DELETE FROM post_comment_likes
+    WHERE comment_id = p_comment_id AND user_id = v_user;
+  ELSE
+    INSERT INTO post_comment_likes (comment_id, user_id)
+    VALUES (p_comment_id, v_user);
+  END IF;
+
+  SELECT count(*) INTO v_new_count
+  FROM post_comment_likes
+  WHERE comment_id = p_comment_id;
+
+  RETURN v_new_count;
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- ============================================================================
 -- REALTIME
@@ -578,9 +843,23 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
+    SELECT 1 FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'comments'
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE comments;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'post_comments'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE post_comments;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'recipes'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE recipes;
   END IF;
 END $$;

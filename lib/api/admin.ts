@@ -482,7 +482,7 @@ export async function getUserActivity(userId: string) {
 }
 
 export async function getDashboardStats() {
-  const [usersRes, episodesRes, answersRes, photosRes] = await Promise.all([
+  const [usersRes, episodesRes, answersRes, photosRes, recipesRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, created_at'),
@@ -495,12 +495,16 @@ export async function getDashboardStats() {
     supabase
       .from('dish_photos')
       .select('id, created_at'),
+    supabase
+      .from('recipes')
+      .select('id, created_at, is_published'),
   ]);
 
   if (usersRes.error) throw usersRes.error;
   if (episodesRes.error) throw episodesRes.error;
   if (answersRes.error) throw answersRes.error;
   if (photosRes.error) throw photosRes.error;
+  if (recipesRes.error) throw recipesRes.error;
 
   const now = new Date();
   const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -508,7 +512,7 @@ export async function getDashboardStats() {
   const newUsersThisWeek = usersRes.data.filter(
     u => new Date(u.created_at) > lastWeek
   ).length;
-  
+
   const newPhotosThisWeek = photosRes.data.filter(
     p => new Date(p.created_at) > lastWeek
   ).length;
@@ -523,5 +527,7 @@ export async function getDashboardStats() {
     correctAnswers: answersRes.data.filter(a => a.is_correct).length,
     totalPhotos: photosRes.data.length,
     newPhotosThisWeek,
+    totalRecipes: recipesRes.data.length,
+    publishedRecipes: recipesRes.data.filter(r => r.is_published).length,
   };
 }

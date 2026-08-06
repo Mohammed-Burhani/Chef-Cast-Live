@@ -39,14 +39,19 @@ export function CommentsSheet({ visible, postId, onClose }: CommentsSheetProps) 
   const loadComments = useCommunityStore((s) => s.loadComments);
   const addComment = useCommunityStore((s) => s.addComment);
   const toggleLikeComment = useCommunityStore((s) => s.toggleLikeComment);
+  const subscribeToComments = useCommunityStore((s) => s.subscribeToComments);
+  const unsubscribeFromComments = useCommunityStore((s) => s.unsubscribeFromComments);
 
   const [newComment, setNewComment] = useState("");
 
   React.useEffect(() => {
-    if (visible && postId) {
-      loadComments(postId);
-    }
-  }, [visible, postId, loadComments]);
+    if (!visible || !postId) return;
+
+    loadComments(postId);
+    subscribeToComments(postId);
+
+    return () => unsubscribeFromComments();
+  }, [visible, postId, loadComments, subscribeToComments, unsubscribeFromComments]);
 
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;

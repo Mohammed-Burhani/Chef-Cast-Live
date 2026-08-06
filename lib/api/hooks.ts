@@ -3,8 +3,11 @@
  * Wraps Supabase API calls with caching + optimistic updates
  */
 
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from './supabase';
+import * as recipesApi from './recipes';
+import { supabase } from '@/lib/supabase';
 
 // ============================================================================
 // QUERY KEYS
@@ -167,5 +170,96 @@ export function useToggleLike() {
 export function useToggleFollow() {
   return useMutation({
     mutationFn: api.toggleFollow,
+  });
+}
+
+// ============================================================================
+// RECIPES
+// ============================================================================
+
+export const recipeKeys = {
+  all: ['recipes'] as const,
+  detail: (id: string) => ['recipes', id] as const,
+};
+
+/**
+ * Fetch published recipes for the homepage + list screens.
+ * Subscribes to postgres_changes on recipes so a freshly published recipe
+ * appears live without a manual refresh (refetchInterval is a fallback).
+ */
+export function useRecipes() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('recipes-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, () => {
+        queryClient.invalidateQueries({ queryKey: recipeKeys.all });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return useQuery({
+    queryKey: recipeKeys.all,
+    queryFn: () => recipesApi.fetchRecipes(false),
+    refetchInterval: 30000,
+  });
+}
+
+/** Fetch all recipes including unpublished — for the admin management page. */
+export function useAdminRecipes() {
+  return useQuery({
+    queryKey: ['recipes', 'admin'],
+    queryFn: () => recipesApi.fetchRecipes(true),
+  });
+}
+
+export function useRecipe(id: string) {
+  return useQuery({
+    queryKey: recipeKeys.detail(id),
+    queryFn: () => recipesApi.fetchRecipeById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateRecipe() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: recipesApi.createRecipe,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: recipeKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['recipes', 'admin'] });
+    },
+  });
+}
+
+export function useUpdateRecipe() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: recipesApi.RecipeInput }) =>
+      recipesApi.updateRecipe(id, updates),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: recipeKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['recipes', 'admin'] });
+      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(data.id) });
+    },
+  });
+}
+
+export function useDeleteRecipe() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => recipesApi.deleteRecipe(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: recipeKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['recipes', 'admin'] });
+    },
   });
 }

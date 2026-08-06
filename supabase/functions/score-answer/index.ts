@@ -125,28 +125,28 @@ serve(async (req) => {
     // Calculate correctness
     const isCorrect = selectedOption === question.correct_option;
 
-    // Calculate points
-    const BASE_POINTS = 100;
-    const MAX_SPEED_BONUS = 50;
-    
-    let basePoints = 0;
-    let speedBonus = 0;
-    let totalPoints = 0;
-
+    // Position-based scoring: points (20/15/10/5/0) are assigned at question
+    // close by score_question(). Here we only report the user's LIVE provisional
+    // rank among correct answers so far (fastest correct answer = #1).
+    let position: number | null = null;
     if (isCorrect) {
-      basePoints = BASE_POINTS;
-      
-      // Speed bonus: linear decay from MAX_SPEED_BONUS to 0
-      // Faster answers get more bonus
-      const timeSeconds = responseTimeMs / 1000;
-      const maxTime = question.timer_seconds;
-      const speedRatio = Math.max(0, 1 - (timeSeconds / maxTime));
-      speedBonus = Math.floor(MAX_SPEED_BONUS * speedRatio);
-      
-      totalPoints = basePoints + speedBonus;
+      const { count, error: posError } = await supabaseClient
+        .from('answers')
+        .select('id', { count: 'exact', head: true })
+        .eq('question_id', questionId)
+        .eq('is_correct', true)
+        .lt('response_time_ms', responseTimeMs);
+
+      if (posError) {
+        console.error('Position count error:', posError.message);
+      } else {
+        position = (count ?? 0) + 1;
+      }
     }
 
-    // Insert answer record (will fail with 23505 if duplicate)
+    // Insert answer record (will fail with 23505 if duplicate).
+    // total_points stays 0 until score_question() runs at close; the
+    // on_answer_inserted trigger still bumps correct_count immediately.
     const { error: answerError } = await supabaseClient
       .from('answers')
       .insert({
@@ -157,9 +157,9 @@ serve(async (req) => {
         is_correct: isCorrect,
         answered_at: new Date().toISOString(),
         response_time_ms: responseTimeMs,
-        base_points: basePoints,
-        speed_bonus: speedBonus,
-        total_points: totalPoints,
+        base_points: 0,
+        speed_bonus: 0,
+        total_points: 0,
       });
 
     // Check for duplicate submission (unique constraint violation)
@@ -177,6 +177,7 @@ serve(async (req) => {
           JSON.stringify({
             isCorrect,
             pointsEarned: 0,
+            position: null,
             newTotalScore: existingScore?.total_score ?? 0,
             newCorrectCount: existingScore?.correct_count ?? 0,
           }),
@@ -204,8 +205,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           isCorrect,
-          pointsEarned: totalPoints,
-          newTotalScore: totalPoints,
+          pointsEarned: 0,
+          position,
+          newTotalScore: 0,
           newCorrectCount: isCorrect ? 1 : 0,
         }),
         {
@@ -218,7 +220,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         isCorrect,
-        pointsEarned: totalPoints,
+        pointsEarned: 0,
+        position,
         newTotalScore: updatedScore.total_score,
         newCorrectCount: updatedScore.correct_count,
       }),

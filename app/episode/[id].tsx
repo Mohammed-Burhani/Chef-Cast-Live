@@ -1,15 +1,18 @@
 /**
  * Episode Details Screen - /episode/[id]
- * Shows episode information, blog/notes, and access to live if active
+ * Shows episode info, a watch/join action, the full quiz with a per-question
+ * reveal-answer toggle, the top-3 leaderboard, and the current user's
+ * rank + points from that episode.
  */
 
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
-  Platform,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,14 +23,168 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useColors } from "@/hooks/useColors";
-import { useEpisodes } from "@/lib/api/hooks";
+import { useEpisode, useQuestions, useLeaderboard } from "@/lib/api/hooks";
+import { fetchMyEpisodeScore } from "@/lib/api/live";
+import { useAuthStore } from "@/store/useAuthStore";
+import type { Database } from "@/types/database";
+
+type QuestionRow = Database["public"]["Tables"]["questions"]["Row"];
+
+const MEDAL_COLORS = ["#F5A623", "#C0C0C0", "#CD7F32"];
+
+// ============================================================================
+// Quiz question — compact card with a per-question reveal-answer toggle
+// ============================================================================
+
+function QuizQuestionCard({ question, index }: { question: QuestionRow; index: number }) {
+  const colors = useColors();
+  const [revealed, setRevealed] = React.useState(false);
+
+  const options = [
+    { key: "a", label: question.option_a },
+    { key: "b", label: question.option_b },
+    { key: "c", label: question.option_c },
+    { key: "d", label: question.option_d },
+  ].filter((o) => !!o.label);
+
+  return (
+    <View style={[styles.qCard, { backgroundColor: colors.surface }]}>
+      <View style={styles.qHeader}>
+        <View style={[styles.qNumber, { backgroundColor: colors.primary }]}>
+          <Text style={styles.qNumberText}>{index + 1}</Text>
+        </View>
+        <Text style={[styles.qQuestion, { color: colors.foreground }]}>
+          {question.question_text}
+        </Text>
+      </View>
+
+      <View style={styles.qOptions}>
+        {options.map((opt) => {
+          const isCorrect = revealed && opt.key === question.correct_option;
+          const dimmed = revealed && opt.key !== question.correct_option;
+          return (
+            <View
+              key={opt.key}
+              style={[
+                styles.qOption,
+                { borderColor: colors.border, backgroundColor: colors.background },
+                isCorrect && {
+                  borderColor: colors.success,
+                  backgroundColor: `${colors.success}18`,
+                },
+                dimmed && { opacity: 0.45 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.qOptionKey,
+                  { backgroundColor: isCorrect ? colors.success : colors.muted },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.qOptionKeyText,
+                    { color: isCorrect ? "#fff" : colors.mutedForeground },
+                  ]}
+                >
+                  {opt.key.toUpperCase()}
+                </Text>
+              </View>
+              <Text style={[styles.qOptionText, { color: colors.foreground }]}>{opt.label}</Text>
+              {isCorrect && <Feather name="check-circle" size={15} color={colors.success} />}
+            </View>
+          );
+        })}
+      </View>
+
+      <TouchableOpacity
+        style={[
+          styles.revealBtn,
+          {
+            backgroundColor: revealed ? colors.background : colors.primary,
+            borderColor: colors.border,
+          },
+        ]}
+        onPress={() => setRevealed((v) => !v)}
+        activeOpacity={0.8}
+      >
+        <Feather
+          name={revealed ? "eye-off" : "eye"}
+          size={14}
+          color={revealed ? colors.foreground : "#fff"}
+        />
+        <Text style={[styles.revealBtnText, { color: revealed ? colors.foreground : "#fff" }]}>
+          {revealed ? "Hide answer" : "Reveal answer"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ============================================================================
+// Top 3 leaderboard
+// ============================================================================
+
+function TopThree({ leaderboard }: { leaderboard: any[] }) {
+  const colors = useColors();
+  const top3 = leaderboard.slice(0, 3);
+
+  return (
+    <View style={[styles.leaderboardCard, { backgroundColor: colors.surface }]}>
+      {top3.map((entry, i) => (
+        <View key={entry.id} style={styles.lbRow}>
+          <View
+            style={[
+              styles.lbRank,
+              { backgroundColor: MEDAL_COLORS[i] ?? colors.muted },
+            ]}
+          >
+            <Text style={styles.lbRankText}>{i + 1}</Text>
+          </View>
+          {entry.profiles?.avatar_url ? (
+            <Image
+              source={{ uri: entry.profiles.avatar_url }}
+              style={styles.lbAvatar}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={[styles.lbAvatar, { backgroundColor: colors.muted }]}>
+              <Feather name="user" size={16} color={colors.mutedForeground} />
+            </View>
+          )}
+          <Text style={[styles.lbName, { color: colors.foreground }]} numberOfLines={1}>
+            {entry.profiles?.username ?? "Player"}
+          </Text>
+          <View style={styles.lbPoints}>
+            <Feather name="zap" size={13} color={colors.accent} />
+            <Text style={[styles.lbPointsText, { color: colors.foreground }]}>
+              {entry.total_score} pts
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ============================================================================
+// Main screen
+// ============================================================================
 
 export default function EpisodeDetailScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: episodes = [], isLoading } = useEpisodes();
+  const episodeId = Array.isArray(id) ? id[0] : id;
+  const user = useAuthStore((s) => s.user);
 
-  const episode = episodes.find(ep => ep.id === id);
+  const { data: episode, isLoading } = useEpisode(episodeId);
+  const { data: questions = [] } = useQuestions(episodeId);
+  const { data: leaderboard = [] } = useLeaderboard(episodeId);
+  const { data: myScore } = useQuery({
+    queryKey: ["episode", episodeId, "my-score", user?.id ?? "anon"],
+    queryFn: () => (episodeId ? fetchMyEpisodeScore(episodeId) : null),
+    enabled: !!episodeId && !!user?.id,
+  });
 
   if (isLoading) {
     return <LoadingSpinner fullScreen />;
@@ -35,11 +192,17 @@ export default function EpisodeDetailScreen() {
 
   if (!episode) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        edges={["top"]}
+      >
         <View style={styles.errorContainer}>
           <Feather name="alert-circle" size={48} color={colors.danger} />
           <Text style={[styles.errorText, { color: colors.foreground }]}>Episode not found</Text>
-          <TouchableOpacity onPress={() => router.back()} style={[styles.backButton, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.backButton, { backgroundColor: colors.primary }]}
+          >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -51,8 +214,14 @@ export default function EpisodeDetailScreen() {
   const isLive = episode.is_live;
   const isUpcoming = !isLive && !isPast;
 
+  const handleWatch = () => {
+    if (episode.youtube_url) {
+      Linking.openURL(episode.youtube_url);
+    }
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -62,11 +231,17 @@ export default function EpisodeDetailScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Hero Image */}
         <View style={styles.hero}>
           <Image
-            source={{ uri: episode.thumbnail_url || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800' }}
+            source={{
+              uri: episode.thumbnail_url || "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800",
+            }}
             style={styles.heroImage}
             contentFit="cover"
             transition={200}
@@ -86,28 +261,20 @@ export default function EpisodeDetailScreen() {
         {/* Episode Info */}
         <View style={styles.info}>
           <Text style={[styles.title, { color: colors.foreground }]}>{episode.title}</Text>
-          
+
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Feather name="calendar" size={14} color={colors.mutedForeground} />
               <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                {new Date(episode.scheduled_at).toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  day: 'numeric', 
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
+                {new Date(episode.scheduled_at).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
                 })}
               </Text>
             </View>
-            {episode.duration_minutes && (
-              <View style={styles.metaItem}>
-                <Feather name="clock" size={14} color={colors.mutedForeground} />
-                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                  {episode.duration_minutes} min
-                </Text>
-              </View>
-            )}
           </View>
 
           {episode.description && (
@@ -117,56 +284,120 @@ export default function EpisodeDetailScreen() {
           )}
         </View>
 
-        {/* Live Action Button */}
+        {/* Watch / Join action */}
         {isLive && (
           <TouchableOpacity
-            style={[styles.liveButton, { backgroundColor: colors.neonRed }]}
+            style={[styles.primaryBtn, { backgroundColor: colors.neonRed }]}
             onPress={() => router.push(`/live/${episode.id}` as never)}
+            activeOpacity={0.9}
           >
             <Feather name="zap" size={18} color="#fff" />
-            <Text style={styles.liveButtonText}>Join Live Session</Text>
+            <Text style={styles.primaryBtnText}>Join Live Session</Text>
           </TouchableOpacity>
         )}
 
-        {/* Upcoming Notice */}
         {isUpcoming && (
-          <View style={[styles.noticeCard, { backgroundColor: `${colors.accent}15`, borderColor: colors.accent }]}>
+          <View
+            style={[
+              styles.noticeCard,
+              { backgroundColor: `${colors.accent}15`, borderColor: colors.accent },
+            ]}
+          >
             <Feather name="clock" size={18} color={colors.accent} />
             <Text style={[styles.noticeText, { color: colors.foreground }]}>
               This episode hasn't started yet.
               {new Date(episode.scheduled_at) > new Date()
                 ? ` Scheduled for ${new Date(episode.scheduled_at).toLocaleDateString()}.`
-                : ' The host will start it shortly.'}
+                : " The host will start it shortly."}
             </Text>
           </View>
         )}
 
-        {/* Episode Content / Blog */}
         {isPast && (
-          <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Episode Highlights</Text>
-            <Text style={[styles.blogText, { color: colors.mutedForeground }]}>
-              {episode.notes || "Episode notes and highlights will be added by the admin after the live session."}
-            </Text>
-          </View>
-        )}
+          <>
+            {episode.youtube_url ? (
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+                onPress={handleWatch}
+                activeOpacity={0.9}
+              >
+                <Feather name="play" size={18} color="#fff" />
+                <Text style={styles.primaryBtnText}>Watch Episode</Text>
+              </TouchableOpacity>
+            ) : (
+              <View
+                style={[
+                  styles.noticeCard,
+                  { backgroundColor: `${colors.accent}15`, borderColor: colors.accent },
+                ]}
+              >
+                <Feather name="video-off" size={18} color={colors.accent} />
+                <Text style={[styles.noticeText, { color: colors.foreground }]}>
+                  The recording for this episode isn't available yet.
+                </Text>
+              </View>
+            )}
 
-        {/* Additional Info */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About This Episode</Text>
-          <View style={styles.infoList}>
-            <View style={styles.infoItem}>
-              <Feather name="user" size={16} color={colors.primary} />
-              <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Chef:</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>Chef Marco</Text>
+            {/* Quiz — all questions with per-question reveal */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quiz</Text>
+                <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>
+                  {questions.length} {questions.length === 1 ? "question" : "questions"}
+                </Text>
+              </View>
+
+              {questions.length > 0 ? (
+                <View style={styles.quizList}>
+                  {questions.map((q, i) => (
+                    <QuizQuestionCard key={q.id} question={q} index={i} />
+                  ))}
+                </View>
+              ) : (
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  No quiz questions were played in this episode.
+                </Text>
+              )}
             </View>
-            <View style={styles.infoItem}>
-              <Feather name="tag" size={16} color={colors.primary} />
-              <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Category:</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>Italian Cuisine</Text>
+
+            {/* Leaderboard + user performance */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+                  Top Scorers
+                </Text>
+              </View>
+
+              {leaderboard.length > 0 ? (
+                <TopThree leaderboard={leaderboard} />
+              ) : (
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  No scores recorded yet.
+                </Text>
+              )}
+
+              {myScore ? (
+                <View style={[styles.perfCard, { backgroundColor: colors.surface }]}>
+                  <View style={styles.perfItem}>
+                    <Text style={[styles.perfValue, { color: colors.primary }]}>#{myScore.rank}</Text>
+                    <Text style={[styles.perfLabel, { color: colors.mutedForeground }]}>
+                      Your Rank
+                    </Text>
+                  </View>
+                  <View style={[styles.perfDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.perfItem}>
+                    <Text style={[styles.perfValue, { color: colors.accent }]}>{myScore.score}</Text>
+                    <Text style={[styles.perfLabel, { color: colors.mutedForeground }]}>Points</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  You didn't join this episode's quiz.
+                </Text>
+              )}
             </View>
-          </View>
-        </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -175,85 +406,166 @@ export default function EpisodeDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  backBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
   scroll: { flex: 1 },
   content: { paddingBottom: 40 },
-  hero: { position: 'relative', height: 280 },
-  heroImage: { width: '100%', height: '100%' },
-  heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120 },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: 24,
+  },
+  errorText: { fontSize: 16, fontWeight: "600" },
+  backButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  backButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  hero: {
+    width: "100%",
+    height: 220,
+    position: "relative",
+  },
+  heroImage: { width: "100%", height: "100%" },
+  heroGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 90,
+  },
   liveBadge: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    position: "absolute",
+    top: 16,
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
-  liveText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  info: { padding: 20, gap: 12 },
-  title: { fontSize: 26, fontWeight: '800', lineHeight: 32 },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#fff" },
+  liveText: { color: "#fff", fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  info: { padding: 20 },
+  title: { fontSize: 24, fontWeight: "800", lineHeight: 30 },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 12 },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   metaText: { fontSize: 13 },
-  description: { fontSize: 15, lineHeight: 22, marginTop: 4 },
-  liveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  description: { fontSize: 15, lineHeight: 22, marginTop: 12 },
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     marginHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 14,
-    marginBottom: 16,
   },
-  liveButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   noticeCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginHorizontal: 20,
+    marginTop: 16,
     padding: 16,
     borderRadius: 14,
     borderWidth: 1,
-    marginBottom: 16,
   },
-  noticeText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  section: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 14,
-    gap: 12,
+  noticeText: { fontSize: 14, flex: 1 },
+  section: { padding: 20, paddingBottom: 0, marginTop: 12 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
-  blogText: { fontSize: 14, lineHeight: 22 },
-  infoList: { gap: 12 },
-  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  infoLabel: { fontSize: 14, minWidth: 70 },
-  infoValue: { fontSize: 14, fontWeight: '600', flex: 1 },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  sectionTitle: { fontSize: 20, fontWeight: "800" },
+  sectionCount: { fontSize: 13, fontWeight: "600" },
+  emptyText: { fontSize: 14, lineHeight: 20, paddingBottom: 12 },
+
+  // Quiz card
+  quizList: { gap: 12 },
+  qCard: { borderRadius: 16, padding: 16 },
+  qHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  qNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qNumberText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  qQuestion: { flex: 1, fontSize: 15, fontWeight: "600", lineHeight: 21 },
+  qOptions: { gap: 8, marginTop: 12 },
+  qOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  qOptionKey: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qOptionKeyText: { fontSize: 12, fontWeight: "800" },
+  qOptionText: { flex: 1, fontSize: 14, lineHeight: 19 },
+  revealBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  revealBtnText: { fontSize: 13, fontWeight: "700" },
+
+  // Leaderboard
+  leaderboardCard: { borderRadius: 16, padding: 8 },
+  lbRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, paddingHorizontal: 6 },
+  lbRank: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lbRankText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  lbAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  lbName: { flex: 1, fontSize: 14, fontWeight: "600" },
+  lbPoints: { flexDirection: "row", alignItems: "center", gap: 4 },
+  lbPointsText: { fontSize: 13, fontWeight: "700" },
+
+  // User performance
+  perfCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
     padding: 20,
-    gap: 16,
+    borderRadius: 16,
+    marginTop: 14,
   },
-  errorText: { fontSize: 18, fontWeight: '600' },
-  backButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  backButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  perfItem: { alignItems: "center", gap: 4 },
+  perfValue: { fontSize: 26, fontWeight: "800" },
+  perfLabel: { fontSize: 13 },
+  perfDivider: { width: 1, height: 40 },
 });

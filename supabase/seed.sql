@@ -115,5 +115,87 @@ END $$;
 -- Note: Replace user_id with actual authenticated user IDs in production
 -- For testing, you can insert after creating test users
 
+-- Insert sample recipes (blog-style, full recipe structure)
+INSERT INTO recipes (title, description, image_url, author_name, difficulty, prep_time_minutes, cook_time_minutes, servings, ingredients, steps) VALUES
+(
+  'Saffron Risotto',
+  'A creamy, luxurious Italian risotto infused with saffron and finished with Parmigiano-Reggiano.',
+  'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400',
+  'Chef Marco',
+  'medium',
+  15,
+  30,
+  4,
+  '[
+    {"name": "Arborio rice", "amount": "1.5 cups", "isOptional": false},
+    {"name": "Chicken or vegetable stock", "amount": "6 cups", "isOptional": false},
+    {"name": "Saffron threads", "amount": "1 pinch", "isOptional": false},
+    {"name": "White wine", "amount": "1/2 cup", "isOptional": false},
+    {"name": "Parmesan cheese", "amount": "1 cup grated", "isOptional": false},
+    {"name": "Butter", "amount": "3 tbsp", "isOptional": false},
+    {"name": "Shallots", "amount": "2 minced", "isOptional": false},
+    {"name": "Fresh parsley", "amount": "2 tbsp", "isOptional": true}
+  ]'::jsonb,
+  '[
+    {"stepNumber": 1, "instruction": "Heat stock in a saucepan and keep warm. Steep saffron in 1/4 cup hot stock.", "durationSeconds": 300},
+    {"stepNumber": 2, "instruction": "In a large pan, sauté shallots in butter until translucent.", "durationSeconds": 180},
+    {"stepNumber": 3, "instruction": "Add rice and toast for 2 minutes, stirring constantly.", "durationSeconds": 120},
+    {"stepNumber": 4, "instruction": "Pour in wine and stir until absorbed.", "durationSeconds": 180},
+    {"stepNumber": 5, "instruction": "Add stock one ladle at a time, stirring frequently until absorbed before adding more.", "durationSeconds": 1200},
+    {"stepNumber": 6, "instruction": "Stir in saffron stock and Parmesan, season, and serve with parsley.", "durationSeconds": 300}
+  ]'::jsonb
+),
+(
+  'Duck Breast with Cherry Glaze',
+  'Crispy-skin duck breast with a glossy tart-cherry reduction, ideal for a special dinner.',
+  'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400',
+  'Chef Sophie',
+  'hard',
+  20,
+  25,
+  2,
+  '[
+    {"name": "Duck breast", "amount": "2", "isOptional": false},
+    {"name": "Cherries (fresh or frozen)", "amount": "1.5 cups", "isOptional": false},
+    {"name": "Red wine", "amount": "1/2 cup", "isOptional": false},
+    {"name": "Balsamic vinegar", "amount": "1 tbsp", "isOptional": false},
+    {"name": "Honey", "amount": "1 tbsp", "isOptional": false},
+    {"name": "Butter", "amount": "1 tbsp", "isOptional": false},
+    {"name": "Salt and pepper", "amount": "to taste", "isOptional": false}
+  ]'::jsonb,
+  '[
+    {"stepNumber": 1, "instruction": "Score duck skin in a crosshatch pattern and season both sides.", "durationSeconds": 300},
+    {"stepNumber": 2, "instruction": "Sear skin-side down in a cold pan over medium heat until golden and crisp.", "durationSeconds": 600},
+    {"stepNumber": 3, "instruction": "Flip and cook to medium-rare (135°F), then rest 5 minutes.", "durationSeconds": 600},
+    {"stepNumber": 4, "instruction": "Deglaze pan with wine, add cherries, balsamic, and honey; reduce to a glaze.", "durationSeconds": 420},
+    {"stepNumber": 5, "instruction": "Slice duck, spoon glaze over, and serve.", "durationSeconds": 300}
+  ]'::jsonb
+),
+(
+  'French Onion Soup',
+  'Slow-caramelized onions in rich beef broth topped with a Gruyère crouton — the bistro classic.',
+  'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400',
+  'Chef Jean-Pierre',
+  'easy',
+  20,
+  45,
+  4,
+  '[
+    {"name": "Yellow onions", "amount": "6 large", "isOptional": false},
+    {"name": "Beef stock", "amount": "8 cups", "isOptional": false},
+    {"name": "Butter", "amount": "4 tbsp", "isOptional": false},
+    {"name": "White wine", "amount": "1/2 cup", "isOptional": false},
+    {"name": "Baguette", "amount": "1/2 loaf", "isOptional": false},
+    {"name": "Gruyère cheese", "amount": "2 cups grated", "isOptional": false},
+    {"name": "Thyme sprigs", "amount": "3", "isOptional": true}
+  ]'::jsonb,
+  '[
+    {"stepNumber": 1, "instruction": "Melt butter and caramelize onions slowly over medium-low heat until deep golden.", "durationSeconds": 1800},
+    {"stepNumber": 2, "instruction": "Deglaze with wine, scraping up the fond.", "durationSeconds": 180},
+    {"stepNumber": 3, "instruction": "Add stock and thyme, simmer 20 minutes, and season.", "durationSeconds": 1200},
+    {"stepNumber": 4, "instruction": "Toast baguette slices, top with Gruyère, and melt under broiler on the soup.", "durationSeconds": 420}
+  ]'::jsonb
+);
+
 -- Insert sample dish photos
 -- Note: Replace user_id with actual authenticated user IDs in production

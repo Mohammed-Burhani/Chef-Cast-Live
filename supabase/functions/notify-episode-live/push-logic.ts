@@ -338,6 +338,26 @@ async function claimOnce(
   return Array.isArray(data) && data.length > 0;
 }
 
+/**
+ * Releases a previously claimed "sent" guard.
+ *
+ * This is only used when the push channel fails before Expo accepts any
+ * request, so a later re-invocation can retry the whole send safely.
+ */
+async function releaseClaim(
+  deps: HandlerDeps,
+  episodeId: string,
+  column: 'live_notification_sent' | 'live_email_sent',
+): Promise<void> {
+  const { error } = await deps.supabaseClient
+    .from('episodes')
+    .update({ [column]: false })
+    .eq('id', episodeId)
+    .eq(column, true);
+
+  if (error) throw error;
+}
+
 export type LiveEmailResult = {
   status: 'skipped' | 'already' | 'sent' | 'failed';
   sent?: number;
@@ -466,56 +486,83 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     const { data: tokens, error: tokensError } = await deps.supabaseClient
       .from('push_tokens')
       .select('id, token');
+    let completedExpoRequests = 0;
 
-    if (tokensError) {
-      throw tokensError;
-    }
-    if (!tokens || tokens.length === 0) {
-      return json({ ok: true, sent: 0 });
-    }
+    try {
+      if (tokensError) {
+        throw tokensError;
+      }
+      if (!tokens || tokens.length === 0) {
+        return json({ ok: true, sent: 0, totalTokens: 0, invalidTokensRemoved: 0, email: emailResult });
+      }
 
-    // 4) Build the push message
-    const message = buildPushMessage(episode);
-    const expoAccessToken = deps.getEnv('EXPO_ACCESS_TOKEN');
+      // 4) Build the push message
+      const message = buildPushMessage(episode);
+      const expoAccessToken = deps.getEnv('EXPO_ACCESS_TOKEN');
 
-    // 5) Send in batches of ≤100 tokens
-    let sent = 0;
-    const invalidTokenIds: string[] = [];
+      // 5) Send in batches of ≤100 tokens
+      let sent = 0;
+      const invalidTokenIds: string[] = [];
 
-    for (const chunk of chunkTokens(tokens)) {
-      const response = await deps.fetchFn(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(expoAccessToken ? { Authorization: `Bearer ${expoAccessToken}` } : {}),
-        },
-        body: JSON.stringify({
-          to: chunk.map((t) => t.token),
-          ...message,
-        }),
+      for (const chunk of chunkTokens(tokens)) {
+        const response = await deps.fetchFn(EXPO_PUSH_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(expoAccessToken ? { Authorization: `Bearer ${expoAccessToken}` } : {}),
+          },
+          body: JSON.stringify({
+            to: chunk.map((t) => t.token),
+            ...message,
+          }),
+        });
+
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          const message =
+            (result && typeof result === 'object' && 'errors' in result
+              ? JSON.stringify((result as { errors?: unknown }).errors)
+              : response.statusText) || 'Expo push request failed';
+          throw new Error(`Expo push request failed (${response.status}): ${message}`);
+        }
+
+        if (!result || typeof result !== 'object' || !Array.isArray((result as { data?: unknown }).data)) {
+          throw new Error('Expo push response did not include a receipts array');
+        }
+
+        completedExpoRequests += 1;
+        const { sent: chunkSent, invalidTokenIds: chunkInvalid } = processExpoReceipts(
+          (result as { data: ExpoReceipt[] }).data,
+          chunk,
+        );
+        sent += chunkSent;
+        invalidTokenIds.push(...chunkInvalid);
+      }
+
+      // 6) Drop tokens that can no longer receive pushes
+      if (invalidTokenIds.length > 0) {
+        await deps.supabaseClient.from('push_tokens').delete().in('id', invalidTokenIds);
+      }
+
+      return json({
+        ok: true,
+        sent,
+        totalTokens: tokens.length,
+        invalidTokensRemoved: invalidTokenIds.length,
+        email: emailResult,
       });
-
-      const result = await response.json().catch(() => ({ data: [] }));
-      const { sent: chunkSent, invalidTokenIds: chunkInvalid } = processExpoReceipts(
-        result.data,
-        chunk,
-      );
-      sent += chunkSent;
-      invalidTokenIds.push(...chunkInvalid);
+    } catch (error) {
+      // Only release the claim when Expo never accepted any request; after a
+      // partial send we keep the guard to avoid duplicate notifications.
+      if (completedExpoRequests === 0) {
+        try {
+          await releaseClaim(deps, episodeId, 'live_notification_sent');
+        } catch (releaseError) {
+          console.error('Failed to release push notification claim:', releaseError);
+        }
+      }
+      throw error;
     }
-
-    // 6) Drop tokens that can no longer receive pushes
-    if (invalidTokenIds.length > 0) {
-      await deps.supabaseClient.from('push_tokens').delete().in('id', invalidTokenIds);
-    }
-
-    return json({
-      ok: true,
-      sent,
-      totalTokens: tokens.length,
-      invalidTokensRemoved: invalidTokenIds.length,
-      email: emailResult,
-    });
   } catch (error) {
     console.error('Edge Function error:', error);
     return json({ error: (error as Error).message || 'Internal server error' }, 500);

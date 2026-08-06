@@ -15,6 +15,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: 'home', route: '/(admin)' },
   { id: 'episodes', label: 'Episodes', icon: 'tv', route: '/(admin)/episodes' },
+  { id: 'recipes', label: 'Recipes', icon: 'book-open', route: '/(admin)/recipes' },
   { id: 'live', label: 'Live Control', icon: 'radio', route: '/(admin)/live-control' },
   { id: 'community', label: 'Community', icon: 'users', route: '/(admin)/community' },
   { id: 'users', label: 'Users', icon: 'user', route: '/(admin)/users' },
@@ -35,6 +36,7 @@ export function AdminSidebar() {
   const getActiveId = () => {
     if (pathname === '/(admin)' || pathname === '/') return 'dashboard';
     if (pathname.includes('/episodes')) return 'episodes';
+    if (pathname.includes('/recipes')) return 'recipes';
     if (pathname.includes('/live-control')) return 'live';
     if (pathname.includes('/community')) return 'community';
     if (pathname.includes('/users')) return 'users';

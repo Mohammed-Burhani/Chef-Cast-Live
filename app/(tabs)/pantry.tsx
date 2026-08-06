@@ -22,8 +22,22 @@ import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { getLevelForXP, getNextLevel } from "@/constants/gamification";
 import { useColors } from "@/hooks/useColors";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
+import { useEventHistory, useQuizHistory, useUserStats } from "@/lib/api/scoring";
 import { Badge } from "@/types";
+
+function formatEventDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
 
 function BadgeDetailModal({ badge, onClose }: { badge: Badge; onClose: () => void }) {
   const colors = useColors();
@@ -86,12 +100,20 @@ export default function PantryScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { xpTotal, currentStreak, longestStreak, badges, xpLog } = useGamificationStore();
+  const { currentStreak, longestStreak, badges } = useGamificationStore();
+  const { user } = useAuthStore();
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const [activeSection, setActiveSection] = useState<"badges" | "xp" | "streak">("badges");
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
-  const currentLevel = getLevelForXP(xpTotal);
-  const nextLevel = getNextLevel(xpTotal);
+  // Real scoring data (replaces the dummy AsyncStorage values)
+  const { data: stats } = useUserStats(user?.id);
+  const { data: events, isLoading: eventsLoading } = useEventHistory(user?.id);
+  const quizHistory = useQuizHistory(user?.id, expandedEventId);
+
+  const xp = stats?.xp ?? 0;
+  const currentLevel = getLevelForXP(xp);
+  const nextLevel = getNextLevel(xp);
   const unlockedCount = badges.filter((b) => b.isUnlocked).length;
 
   const SECTIONS = [
@@ -148,34 +170,130 @@ export default function PantryScreen() {
           </View>
         )}
 
-        {/* XP / LEVEL SECTION */}
+        {/* LEVEL SECTION — real scoring + event history */}
         {activeSection === "xp" && (
           <View style={styles.xpSection}>
+            {/* Overall total experience/score */}
             <View style={[styles.xpCard, { backgroundColor: colors.surface }]}>
-              <XPProgressRing xp={xpTotal} size={160} />
+              <XPProgressRing xp={xp} size={160} />
               <View style={styles.levelInfo}>
                 <Text style={[styles.levelName, { color: colors.foreground }]}>{currentLevel.name}</Text>
-                {nextLevel && (
+                {nextLevel ? (
                   <Text style={[styles.nextLevelText, { color: colors.mutedForeground }]}>
-                    {nextLevel.minXP - xpTotal} XP until {nextLevel.name}
+                    {nextLevel.minXP - xp} XP until {nextLevel.name}
+                  </Text>
+                ) : (
+                  <Text style={[styles.nextLevelText, { color: colors.mutedForeground }]}>
+                    Max level reached 🎉
                   </Text>
                 )}
               </View>
             </View>
 
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Recent XP Events</Text>
-            <View style={styles.xpLogList}>
-              {xpLog.map((entry) => (
-                <View key={entry.id} style={[styles.xpLogRow, { backgroundColor: colors.surface }]}>
-                  <View style={[styles.xpLogDot, { backgroundColor: `${colors.accent}22` }]}>
-                    <Feather name="star" size={12} color={colors.accent} />
+            {/* Stat chips */}
+            <View style={styles.statRow}>
+              <View style={[styles.statChip, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.statChipValue, { color: colors.foreground }]}>
+                  {stats?.eventCount ?? 0}
+                </Text>
+                <Text style={[styles.statChipLabel, { color: colors.mutedForeground }]}>Events</Text>
+              </View>
+              <View style={[styles.statChip, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.statChipValue, { color: colors.accent }]}>
+                  {(stats?.lifetimePoints ?? 0).toLocaleString()}
+                </Text>
+                <Text style={[styles.statChipLabel, { color: colors.mutedForeground }]}>Points</Text>
+              </View>
+              <View style={[styles.statChip, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.statChipValue, { color: colors.neonRed }]}>
+                  {stats?.bestRank ? `#${stats.bestRank}` : "—"}
+                </Text>
+                <Text style={[styles.statChipLabel, { color: colors.mutedForeground }]}>Best Rank</Text>
+              </View>
+            </View>
+
+            {/* Past live events participated in */}
+            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Past Live Events</Text>
+            {eventsLoading && (
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Loading events…</Text>
+            )}
+            {!eventsLoading && (events ?? []).length === 0 && (
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                You haven't participated in any live events yet. Join the next live quiz to start earning points!
+              </Text>
+            )}
+            <View style={styles.eventList}>
+              {(events ?? []).map((event) => {
+                const expanded = expandedEventId === event.episodeId;
+                return (
+                  <View key={event.episodeId} style={styles.eventItem}>
+                    <TouchableOpacity
+                      style={[styles.eventRow, { backgroundColor: colors.surface }]}
+                      onPress={() => setExpandedEventId(expanded ? null : event.episodeId)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.eventInfo}>
+                        <Text style={[styles.eventTitle, { color: colors.foreground }]} numberOfLines={1}>
+                          {event.title}
+                        </Text>
+                        <Text style={[styles.eventMeta, { color: colors.mutedForeground }]}>
+                          {event.endedAt ? formatEventDate(event.endedAt) : ""} · {event.correctCount} correct
+                        </Text>
+                      </View>
+                      <View style={styles.eventRight}>
+                        <Text style={[styles.eventScore, { color: colors.accent }]}>
+                          +{event.totalScore.toLocaleString()} pts
+                        </Text>
+                        {event.rank != null && (
+                          <Text style={[styles.eventRank, { color: colors.mutedForeground }]}>
+                            Rank #{event.rank}
+                          </Text>
+                        )}
+                        <Feather
+                          name={expanded ? "chevron-up" : "chevron-down"}
+                          size={16}
+                          color={colors.mutedForeground}
+                        />
+                      </View>
+                    </TouchableOpacity>
+
+                    {expanded && (
+                      <View style={[styles.quizList, { backgroundColor: colors.surface }]}>
+                        {quizHistory.isLoading && (
+                          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                            Loading questions…
+                          </Text>
+                        )}
+                        {(quizHistory.data ?? []).map((q, idx) => (
+                          <View key={q.questionId} style={styles.quizRow}>
+                            <Text style={[styles.quizIndex, { color: colors.mutedForeground }]}>
+                              Q{idx + 1}
+                            </Text>
+                            <View style={styles.quizInfo}>
+                              <Text style={[styles.quizText, { color: colors.foreground }]} numberOfLines={2}>
+                                {q.questionText}
+                              </Text>
+                              <Text style={[styles.quizMeta, { color: colors.mutedForeground }]}>
+                                {q.isCorrect
+                                  ? `Correct${q.rank != null ? ` · Rank #${q.rank}` : ""}`
+                                  : "Wrong"}
+                              </Text>
+                            </View>
+                            <Text
+                              style={[
+                                styles.quizPoints,
+                                { color: q.isCorrect ? colors.success : colors.mutedForeground },
+                              ]}
+                            >
+                              {q.isCorrect ? `+${q.points}` : "0"}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
-                  <Text style={[styles.xpLogLabel, { color: colors.foreground }]} numberOfLines={1}>
-                    {entry.label}
-                  </Text>
-                  <Text style={[styles.xpLogAmount, { color: colors.accent }]}>+{entry.amount}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </View>
         )}
@@ -255,11 +373,27 @@ const styles = StyleSheet.create({
   levelName: { fontSize: 18, fontWeight: "700" },
   nextLevelText: { fontSize: 12 },
   sectionLabel: { fontSize: 15, fontWeight: "700" },
-  xpLogList: { gap: 7 },
-  xpLogRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 10 },
-  xpLogDot: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  xpLogLabel: { flex: 1, fontSize: 12 },
-  xpLogAmount: { fontSize: 13, fontWeight: "700" },
+  emptyText: { fontSize: 13, lineHeight: 19, paddingVertical: 6 },
+  statRow: { flexDirection: "row", gap: 10 },
+  statChip: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: "center", gap: 3 },
+  statChipValue: { fontSize: 18, fontWeight: "800" },
+  statChipLabel: { fontSize: 11 },
+  eventList: { gap: 10 },
+  eventItem: { gap: 6 },
+  eventRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 14 },
+  eventInfo: { flex: 1, gap: 3 },
+  eventTitle: { fontSize: 14, fontWeight: "700" },
+  eventMeta: { fontSize: 11 },
+  eventRight: { alignItems: "flex-end", gap: 2 },
+  eventScore: { fontSize: 14, fontWeight: "800" },
+  eventRank: { fontSize: 11 },
+  quizList: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 6, gap: 4 },
+  quizRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  quizIndex: { fontSize: 11, fontWeight: "700", width: 26 },
+  quizInfo: { flex: 1, gap: 2 },
+  quizText: { fontSize: 13 },
+  quizMeta: { fontSize: 11 },
+  quizPoints: { fontSize: 13, fontWeight: "700" },
   streakSection: { gap: 12 },
   streakCard: { borderRadius: 18, padding: 20, alignItems: "center", gap: 16 },
   streakStats: { flexDirection: "row", alignItems: "center", gap: 14 },

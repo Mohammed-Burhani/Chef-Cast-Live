@@ -256,6 +256,35 @@ export async function submitAnswerLive(params: {
 }
 
 /**
+ * Fetch the current user's score + rank for a finished episode.
+ * Returns null if the user never joined that episode's quiz.
+ */
+export async function fetchMyEpisodeScore(episodeId: string) {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session?.session) return null;
+  const userId = session.session.user.id;
+
+  const { data: myRow, error } = await supabase
+    .from('episode_scores')
+    .select('total_score')
+    .eq('episode_id', episodeId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!myRow) return null;
+
+  // Rank = number of players with a higher score, + 1
+  const { count, error: countError } = await supabase
+    .from('episode_scores')
+    .select('id', { count: 'exact', head: true })
+    .eq('episode_id', episodeId)
+    .gt('total_score', myRow.total_score);
+  if (countError) throw countError;
+
+  return { score: myRow.total_score, rank: (count ?? 0) + 1 };
+}
+
+/**
  * Start watching an episode (ensure episode_scores entry exists)
  */
 export async function joinLiveSession(episodeId: string) {
