@@ -24,10 +24,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { AnnouncementsDrawer } from "@/components/ui/AnnouncementsDrawer";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
-import { usePollStore } from "@/store/usePollStore";
+import { useUnseenAnnouncementCount } from "@/store/useAnnouncementReadStore";
 import { useEpisodeStore } from "@/store/episodeStore";
 import { useLiveEpisode, useEpisodes, useDishPhotos, useRecipes, useAnnouncements, keys } from "@/lib/api/hooks";
 import { useUpcomingEpisodes, liveKeys } from "@/lib/api/live";
@@ -154,8 +155,8 @@ export default function HomeScreen() {
   const { currentStreak = 0, badges = [] } = useGamificationStore();
   const { data: stats } = useUserStats(user?.id);
   const xpTotal = stats?.xp ?? 0;
-  const showPoll = usePollStore((s) => s.showPoll);
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
+  const [notifOpen, setNotifOpen] = React.useState(false);
   const queryClient = useQueryClient();
 
   // Live episodes we watched flip from a reminder during this session. Keeps
@@ -190,6 +191,7 @@ export default function HomeScreen() {
   const { data: soonLive } = useUpcomingEpisodes();
   const { data: recipes = [] } = useRecipes();
   const { data: announcements = [] } = useAnnouncements();
+  const unseenCount = useUnseenAnnouncementCount(announcements);
   const railEpisodes = buildUpcomingRail(soonLive, transitionedLiveIds);
   const topRecipes = recipes.slice(0, 8);
 
@@ -223,21 +225,6 @@ export default function HomeScreen() {
   if (isLoading) {
     return <LoadingSpinner fullScreen />;
   }
-
-  const triggerMockPoll = () => {
-    showPoll({
-      id: "poll-live-001",
-      episodeId: "ep-001",
-      question: "Which wine should Chef Marco use for the risotto?",
-      isActive: true,
-      options: [
-        { id: "opt-1", label: "Dry Vermouth", votes: 234 },
-        { id: "opt-2", label: "Pinot Grigio", votes: 189 },
-        { id: "opt-3", label: "Chardonnay", votes: 156 },
-        { id: "opt-4", label: "Sauvignon Blanc", votes: 98 },
-      ],
-    });
-  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
@@ -274,10 +261,17 @@ export default function HomeScreen() {
               <StreakFlame streak={currentStreak} size="sm" />
               <TouchableOpacity
                 style={[styles.notifBtn, { backgroundColor: colors.surface }]}
-                onPress={triggerMockPoll}
+                onPress={() => setNotifOpen(true)}
+                activeOpacity={0.7}
               >
                 <Feather name="bell" size={18} color={colors.foreground} />
-                <View style={[styles.notifDot, { backgroundColor: colors.live }]} />
+                {unseenCount > 0 && (
+                  <View style={[styles.notifBadge, { backgroundColor: colors.live }]}>
+                    <Text style={styles.notifBadgeText}>
+                      {unseenCount > 99 ? '99+' : unseenCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -645,6 +639,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Notifications drawer — announcements */}
+      <AnnouncementsDrawer
+        visible={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        announcements={announcements}
+      />
     </SafeAreaView>
   );
 }
@@ -662,7 +663,18 @@ const styles = StyleSheet.create({
   username: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
   notifBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", position: "relative" },
-  notifDot: { position: "absolute", top: 8, right: 8, width: 8, height: 8, borderRadius: 4 },
+  notifBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   section: { gap: 12 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { fontSize: 18, fontWeight: "700" },
