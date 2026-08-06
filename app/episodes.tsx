@@ -6,7 +6,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Platform,
@@ -133,17 +133,20 @@ function EpisodeCard({ episode }: { episode: Episode }) {
 
 export default function EpisodesScreen() {
   const colors = useColors();
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>(
+    tab === 'past' ? 'past' : 'upcoming'
+  );
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
 
   // Upcoming = not live, not ended (regardless of scheduled_at)
   const upcomingEpisodes = episodes.filter(
     (ep) => !ep.is_live && !ep.ended_at
   );
-  // Past = only episodes admin explicitly ended
-  const pastEpisodes = episodes.filter(
-    (ep) => ep.ended_at
-  );
+  // Past = only episodes admin explicitly ended, most recent first
+  const pastEpisodes = episodes
+    .filter((ep) => ep.ended_at)
+    .sort((a, b) => new Date(b.ended_at!).getTime() - new Date(a.ended_at!).getTime());
 
   if (isLoading) {
     return <LoadingSpinner fullScreen />;

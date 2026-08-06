@@ -200,8 +200,11 @@ export default function HomeScreen() {
 
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  // Past = only episodes explicitly ended by admin
-  const pastEpisodes = episodes.filter((e) => e.ended_at).slice(0, 3);
+  // Past = only episodes explicitly ended by admin, most recent first, latest 5
+  const pastEpisodes = episodes
+    .filter((e) => e.ended_at)
+    .sort((a, b) => new Date(b.ended_at!).getTime() - new Date(a.ended_at!).getTime())
+    .slice(0, 5);
 
   // Upcoming = not live, not ended (regardless of whether scheduled_at is in the past)
   const episodesNotEnded = episodes.filter((e) => !e.is_live && !e.ended_at);
@@ -403,7 +406,7 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Episodes</Text>
-              <TouchableOpacity onPress={() => router.push("/episodes" as never)}>
+              <TouchableOpacity onPress={() => router.push("/episodes?tab=past" as never)}>
                 <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
               </TouchableOpacity>
             </View>
