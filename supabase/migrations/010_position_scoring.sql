@@ -15,7 +15,7 @@
 -- in ONE set-based SQL pass so it stays fast at ~30k participants.
 --
 -- A user's lifetime XP (`profiles.xp`) is rolled up from every scored answer,
--- which powers the overall total shown on Home and the Pantry "Level" tab.
+-- which powers the overall total shown on Home and the Achievements "Level" tab.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------

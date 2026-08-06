@@ -1,6 +1,6 @@
 /**
- * Virtual Pantry & Gamification screen.
- * Sections: Badge Collection, XP & Level System, Streak Tracker, Virtual Pantry.
+ * Achievements & Gamification screen.
+ * Sections: Badge Collection, XP & Level System, Streak Tracker.
  */
 
 import { Feather } from "@expo/vector-icons";
@@ -94,7 +94,7 @@ function BadgeDetailModal({ badge, onClose }: { badge: Badge; onClose: () => voi
   );
 }
 
-export default function PantryScreen() {
+export default function AchievementsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -131,7 +131,7 @@ export default function PantryScreen() {
       >
         {/* Header with neon red accent */}
         <View style={styles.headerRow}>
-          <Text style={[styles.screenTitle, { color: colors.foreground }]}>Pantry</Text>
+          <Text style={[styles.screenTitle, { color: colors.foreground }]}>Achievements</Text>
           <View style={[styles.neonAccent, { backgroundColor: `${colors.neonRed}20`, borderColor: colors.neonRed }]}>
             <Feather name="zap" size={14} color={colors.neonRed} />
           </View>

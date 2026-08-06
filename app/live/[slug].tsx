@@ -105,7 +105,7 @@ export default function LiveSessionScreen() {
       queryClient.invalidateQueries({
         queryKey: liveKeys.userAnswer(episodeId, event.questionId),
       });
-      // Fresh overall score for Home / Pantry after this question's points land.
+      // Fresh overall score for Home / Achievements after this question's points land.
       queryClient.invalidateQueries({ queryKey: scoringKeys.all });
     }, [episodeId, handleQuestionClosed, queryClient]),
   });

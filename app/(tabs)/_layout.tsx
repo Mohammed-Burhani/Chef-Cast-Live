@@ -1,6 +1,6 @@
 /**
  * Main tab bar layout with 5 tabs:
- * Home, Cook-Along, Community, Pantry, Profile
+ * Home, Cook-Along, Community, Achievements, Profile
  */
 
 import { Feather } from "@expo/vector-icons";
@@ -77,9 +77,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="pantry"
+        name="achievements"
         options={{
-          title: "Pantry",
+          title: "Achievements",
           tabBarIcon: ({ color, size }) => (
             <Feather name="award" size={size - 2} color={color} />
           ),
