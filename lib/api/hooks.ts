@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from './supabase';
 import * as recipesApi from './recipes';
+import * as announcementsApi from './announcements';
 import { supabase } from '@/lib/supabase';
 
 // ============================================================================
@@ -260,6 +261,88 @@ export function useDeleteRecipe() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: recipeKeys.all });
       queryClient.invalidateQueries({ queryKey: ['recipes', 'admin'] });
+    },
+  });
+}
+
+// ============================================================================
+// ANNOUNCEMENTS
+// ============================================================================
+
+export const announcementKeys = {
+  all: ['announcements'] as const,
+  admin: ['announcements', 'admin'] as const,
+};
+
+/**
+ * Fetch published announcements for the homepage + listing screen.
+ * Subscribes to postgres_changes on announcements so a freshly published
+ * announcement appears live without a manual refresh (refetchInterval fallback).
+ */
+export function useAnnouncements() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('announcements-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        queryClient.invalidateQueries({ queryKey: announcementKeys.all });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return useQuery({
+    queryKey: announcementKeys.all,
+    queryFn: announcementsApi.fetchAnnouncements,
+    refetchInterval: 30000,
+  });
+}
+
+/** Fetch all announcements including drafts — for the admin management page. */
+export function useAdminAnnouncements() {
+  return useQuery({
+    queryKey: announcementKeys.admin,
+    queryFn: announcementsApi.fetchAllAnnouncements,
+  });
+}
+
+export function useCreateAnnouncement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: announcementsApi.createAnnouncement,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.all });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.admin });
+    },
+  });
+}
+
+export function useUpdateAnnouncement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: announcementsApi.AnnouncementInput }) =>
+      announcementsApi.updateAnnouncement(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.all });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.admin });
+    },
+  });
+}
+
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => announcementsApi.deleteAnnouncement(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.all });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.admin });
     },
   });
 }

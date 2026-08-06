@@ -84,6 +84,7 @@ function RootLayoutNav() {
       <Stack.Screen name="mystery-box" options={{ presentation: "modal" }} />
       <Stack.Screen name="scanner" options={{ presentation: "modal" }} />
       <Stack.Screen name="episode/[id]" />
+      <Stack.Screen name="announcements" />
       <Stack.Screen name="email-unsubscribe" />
     </Stack>
   );

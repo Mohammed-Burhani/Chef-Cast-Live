@@ -29,11 +29,12 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { usePollStore } from "@/store/usePollStore";
 import { useEpisodeStore } from "@/store/episodeStore";
-import { useLiveEpisode, useEpisodes, useDishPhotos, useRecipes, keys } from "@/lib/api/hooks";
+import { useLiveEpisode, useEpisodes, useDishPhotos, useRecipes, useAnnouncements, keys } from "@/lib/api/hooks";
 import { useUpcomingEpisodes, liveKeys } from "@/lib/api/live";
 import { useUserStats } from "@/lib/api/scoring";
 import { useEpisodeFeedEvents } from "@/lib/realtime/hooks";
 import { buildUpcomingRail } from "@/lib/home/upcomingRail";
+import { formatRelativeTime } from "@/lib/utils/time";
 
 interface Episode {
   id: string;
@@ -188,6 +189,7 @@ export default function HomeScreen() {
   const { data: dishPhotos = [] } = useDishPhotos();
   const { data: soonLive } = useUpcomingEpisodes();
   const { data: recipes = [] } = useRecipes();
+  const { data: announcements = [] } = useAnnouncements();
   const railEpisodes = buildUpcomingRail(soonLive, transitionedLiveIds);
   const topRecipes = recipes.slice(0, 8);
 
@@ -533,31 +535,46 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Admin Posts */}
+        {/* What's Cooking — latest announcements from the team */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>What's Cooking</Text>
+            {announcements.length > 0 && (
+              <TouchableOpacity onPress={() => router.push('/announcements' as never)}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <View style={{ gap: 12 }}>
-            {[
-              { id: 1, text: '🔥 New episode tomorrow: "Italian Risotto Night" with Chef Marco!', time: '2h ago' },
-              { id: 2, text: '📢 Mystery Box challenge opens tonight at 8 PM EST. Are you ready?', time: '5h ago' },
-            ].map((post) => (
-              <View key={post.id} style={[styles.postCard, { backgroundColor: colors.surface }]}>
-                <View style={styles.postHeader}>
-                  <Image
-                    source={{ uri: 'https://i.pravatar.cc/150?img=68' }}
-                    style={styles.postAvatar}
-                    contentFit="cover"
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.postUsername, { color: colors.foreground }]}>Foodilicious Team</Text>
-                    <Text style={[styles.postTime, { color: colors.mutedForeground }]}>{post.time}</Text>
-                  </View>
-                </View>
-                <Text style={[styles.postText, { color: colors.foreground }]}>{post.text}</Text>
+            {announcements.length === 0 ? (
+              <View style={[styles.postCard, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.postText, { color: colors.mutedForeground }]}>
+                  No announcements yet. Check back soon!
+                </Text>
               </View>
-            ))}
+            ) : (
+              announcements.slice(0, 3).map((announcement) => (
+                <View key={announcement.id} style={[styles.postCard, { backgroundColor: colors.surface }]}>
+                  <View style={styles.postHeader}>
+                    <View style={[styles.postAvatarWrap, { backgroundColor: colors.primary }]}>
+                      <Feather name="volume-2" size={16} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.postUsername, { color: colors.foreground }]}>Foodilicious Team</Text>
+                      <Text style={[styles.postTime, { color: colors.mutedForeground }]}>
+                        {formatRelativeTime(announcement.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.postTitle, { color: colors.foreground }]} numberOfLines={2}>
+                    {announcement.title}
+                  </Text>
+                  <Text style={[styles.postText, { color: colors.foreground }]} numberOfLines={3}>
+                    {announcement.message}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
@@ -706,7 +723,9 @@ const styles = StyleSheet.create({
   postCard: { borderRadius: 14, padding: 14, gap: 10 },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   postAvatar: { width: 36, height: 36, borderRadius: 18 },
+  postAvatarWrap: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   postUsername: { fontSize: 13, fontWeight: '600' },
   postTime: { fontSize: 11 },
+  postTitle: { fontSize: 15, fontWeight: '700', lineHeight: 20 },
   postText: { fontSize: 14, lineHeight: 20 },
 });

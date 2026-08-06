@@ -589,6 +589,33 @@ export interface Database {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          id: string
+          title: string
+          message: string
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          message: string
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          message?: string
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           id: string

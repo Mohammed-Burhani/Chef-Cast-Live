@@ -93,6 +93,15 @@ export default function AdminDashboard() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: colors.warning }]}
+            onPress={() => router.push('/(admin)/announcements' as any)}
+            activeOpacity={0.8}
+          >
+            <Feather name="volume-2" size={28} color="#fff" />
+            <Text style={styles.actionLabel}>Announcements</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.actionCard, { backgroundColor: colors.accent }]}
             onPress={() => router.push('/(admin)/community' as any)}
             activeOpacity={0.8}
