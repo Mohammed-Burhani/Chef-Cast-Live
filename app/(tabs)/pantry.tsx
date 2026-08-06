@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BadgeCard } from "@/components/gamification/BadgeCard";
 import { StreakFlame } from "@/components/gamification/StreakFlame";
@@ -123,7 +123,7 @@ export default function PantryScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 80 }]}
@@ -350,7 +350,7 @@ export default function PantryScreen() {
       {selectedBadge && (
         <BadgeDetailModal badge={selectedBadge} onClose={() => setSelectedBadge(null)} />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

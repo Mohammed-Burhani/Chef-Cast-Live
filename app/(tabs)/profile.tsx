@@ -16,12 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getLevelForXP } from "@/constants/gamification";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
+import { useUserStats } from "@/lib/api/scoring";
 import { useProfile } from "@/lib/api/hooks";
 
 interface SettingRowProps {
@@ -70,13 +71,16 @@ export default function ProfileScreen() {
 
   const profile = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const { xpTotal, currentStreak, longestStreak, badges } = useGamificationStore();
+  const { currentStreak, longestStreak, badges } = useGamificationStore();
+  // Real scoring data (replaces the dummy AsyncStorage values)
+  const { data: stats } = useUserStats(profile?.id);
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
 
-  const currentLevel = getLevelForXP(xpTotal);
+  const xp = stats?.xp ?? 0;
+  const currentLevel = getLevelForXP(xp);
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
 
   const handleLogout = async () => {
@@ -99,7 +103,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 80 }]}
@@ -131,10 +135,10 @@ export default function ProfileScreen() {
         {/* Stats grid */}
         <View style={[styles.statsGrid, { backgroundColor: colors.surface }]}>
           {[
-            { label: "Total XP", value: xpTotal.toLocaleString(), icon: "star" as const, color: colors.accent },
+            { label: "Total XP", value: xp.toLocaleString(), icon: "star" as const, color: colors.accent },
             { label: "Badges", value: `${unlockedBadges}/10`, icon: "award" as const, color: colors.primary },
             { label: "Best Streak", value: `${longestStreak}d`, icon: "zap" as const, color: colors.warning },
-            { label: "Sessions", value: "12", icon: "coffee" as const, color: colors.success },
+            { label: "Sessions", value: `${stats?.eventCount ?? 0}`, icon: "coffee" as const, color: colors.success },
           ].map((stat, idx) => (
             <View key={idx} style={styles.statItem}>
               <Feather name={stat.icon} size={18} color={stat.color} />
@@ -265,7 +269,7 @@ export default function ProfileScreen() {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

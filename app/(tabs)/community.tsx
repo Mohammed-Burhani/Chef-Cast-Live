@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useCommunityStore } from "@/store/communityStore";
@@ -113,7 +113,7 @@ export default function CommunityScreen() {
     : posts;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: bottomPadding + 80 }}
@@ -123,7 +123,7 @@ export default function CommunityScreen() {
         }
       >
         {/* Header */}
-        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
+        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : 0 }]}>
           <Text style={[styles.title, { color: colors.foreground }]}>Community</Text>
           <TouchableOpacity
             onPress={() => setShowCreatePost(true)}
@@ -248,7 +248,7 @@ export default function CommunityScreen() {
         onClose={() => setShowStoryViewer(false)}
         onUserPress={handleUserPress}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
