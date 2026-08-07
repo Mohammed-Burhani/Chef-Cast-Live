@@ -15,9 +15,11 @@ type StatCardProps = {
     value: number;
     isPositive: boolean;
   };
+  /** Optional secondary line under the label (e.g. "Today 3 · Month 24") */
+  subtitle?: string;
 };
 
-export function StatCard({ icon, value, label, iconColor, trend }: StatCardProps) {
+export function StatCard({ icon, value, label, iconColor, trend, subtitle }: StatCardProps) {
   const colors = useColors();
 
   return (
@@ -25,13 +27,18 @@ export function StatCard({ icon, value, label, iconColor, trend }: StatCardProps
       <View style={styles.iconContainer}>
         <Feather name={icon} size={24} color={iconColor || colors.primary} />
       </View>
-      
+
       <View style={styles.content}>
         <Text style={[styles.value, { color: colors.foreground }]}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </Text>
         <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>
-        
+        {subtitle ? (
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+            {subtitle}
+          </Text>
+        ) : null}
+
         {trend && (
           <View style={styles.trend}>
             <Feather
@@ -83,6 +90,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  subtitle: {
+    fontSize: 11,
+    marginTop: 2,
   },
   trend: {
     flexDirection: 'row',

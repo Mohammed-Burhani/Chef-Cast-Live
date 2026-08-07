@@ -4,6 +4,20 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import {
+  buildDailySeries,
+  buildTopEpisodes,
+  computeGrowth,
+  countActiveUsersToday,
+  cumulativeWithBaseline,
+  lastNDays,
+  startOfDay,
+} from '@/lib/utils/analytics';
+import type {
+  EpisodeStatusCounts,
+  SeriesPoint,
+  TopEpisode,
+} from '@/lib/utils/analytics';
 
 // ============================================================================
 // EPISODES
@@ -481,53 +495,224 @@ export async function getUserActivity(userId: string) {
   };
 }
 
-export async function getDashboardStats() {
-  const [usersRes, episodesRes, answersRes, photosRes, recipesRes] = await Promise.all([
+export type TopScorer = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  xp: number;
+  level_title: string;
+  total_correct: number;
+  episodes_participated: number;
+  /** 1-based overall rank by XP */
+  rank: number;
+};
+
+export type AdminDashboardStats = {
+  // ── Totals / legacy fields (names preserved) ────────────────────────────
+  totalUsers: number;
+  newUsersThisWeek: number;
+  liveEpisodes: number;
+  upcomingEpisodes: number;
+  completedEpisodes: number;
+  totalAnswers: number;
+  correctAnswers: number;
+  totalPhotos: number;
+  newPhotosThisWeek: number;
+  totalRecipes: number;
+  publishedRecipes: number;
+
+  // ── New key stats ───────────────────────────────────────────────────────
+  newUsersToday: number;
+  newUsersThisMonth: number;
+  /** Week-over-week signup growth %, null when previous week was 0 */
+  usersGrowthPct: number | null;
+  /** Distinct users with activity (answer / join / photo) today */
+  activeToday: number;
+  accuracyPct: number;
+  avgResponseTimeMs: number;
+  totalLikes: number;
+  totalComments: number;
+  totalFollows: number;
+  totalBadgesAwarded: number;
+
+  // ── Chart series (last 14 days) ─────────────────────────────────────────
+  signupsDaily: SeriesPoint[];
+  /** Cumulative signups, anchored at the true pre-window total */
+  signupsSeries: SeriesPoint[];
+  answersDaily: SeriesPoint[];
+
+  // ── Episode status ──────────────────────────────────────────────────────
+  episodeStatus: EpisodeStatusCounts;
+
+  // ── Lists ───────────────────────────────────────────────────────────────
+  topScorers: TopScorer[];
+  topEpisodes: TopEpisode[];
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export async function getDashboardStats(): Promise<AdminDashboardStats> {
+  const [usersRes, topScorersRes, episodesRes, answersRes, scoresRes, photosRes, commentsRes, recipesRes, followsRes, badgesRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, created_at'),
     supabase
+      .from('profiles')
+      .select('id, username, avatar_url, xp, level_title, total_correct, episodes_participated')
+      .order('xp', { ascending: false })
+      .limit(10),
+    supabase
       .from('episodes')
-      .select('id, is_live, ended_at'),
+      .select('id, title, status, is_live, ended_at'),
     supabase
       .from('answers')
-      .select('id, created_at, is_correct'),
+      .select('id, user_id, episode_id, is_correct, response_time_ms, answered_at'),
+    supabase
+      .from('episode_scores')
+      .select('id, user_id, episode_id, created_at'),
     supabase
       .from('dish_photos')
-      .select('id, created_at'),
+      .select('id, user_id, created_at, like_count'),
+    supabase
+      .from('post_comments')
+      .select('id', { count: 'exact', head: true }),
     supabase
       .from('recipes')
       .select('id, created_at, is_published'),
+    supabase
+      .from('follows')
+      .select('id', { count: 'exact', head: true }),
+    supabase
+      .from('user_badges')
+      .select('id', { count: 'exact', head: true }),
   ]);
 
-  if (usersRes.error) throw usersRes.error;
-  if (episodesRes.error) throw episodesRes.error;
-  if (answersRes.error) throw answersRes.error;
-  if (photosRes.error) throw photosRes.error;
-  if (recipesRes.error) throw recipesRes.error;
+  for (const res of [usersRes, topScorersRes, episodesRes, answersRes, scoresRes, photosRes, commentsRes, recipesRes, followsRes, badgesRes]) {
+    if (res.error) throw res.error;
+  }
 
   const now = new Date();
-  const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const lastWeek = new Date(now.getTime() - 7 * DAY_MS);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * DAY_MS);
+  const days = lastNDays(14, now);
 
-  const newUsersThisWeek = usersRes.data.filter(
-    u => new Date(u.created_at) > lastWeek
+  const users = usersRes.data ?? [];
+  const episodes = episodesRes.data ?? [];
+  const answers = answersRes.data ?? [];
+  const photos = photosRes.data ?? [];
+  const recipes = recipesRes.data ?? [];
+  const scores = scoresRes.data ?? [];
+  const topScorers = topScorersRes.data ?? [];
+
+  const newUsersToday = users.filter(
+    (u) => new Date(u.created_at) >= startOfDay(now)
+  ).length;
+  const newUsersThisWeek = users.filter(
+    (u) => new Date(u.created_at) > lastWeek
+  ).length;
+  const newUsersThisMonth = users.filter((u) => {
+    const d = new Date(u.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
+  const currentWeek = users.filter((u) => new Date(u.created_at) > lastWeek).length;
+  const previousWeek = users.filter(
+    (u) => {
+      const d = new Date(u.created_at);
+      return d > twoWeeksAgo && d <= lastWeek;
+    }
   ).length;
 
-  const newPhotosThisWeek = photosRes.data.filter(
-    p => new Date(p.created_at) > lastWeek
+  const newPhotosThisWeek = photos.filter(
+    (p) => new Date(p.created_at) > lastWeek
   ).length;
+
+  const correctAnswers = answers.filter((a) => a.is_correct).length;
+  const accuracyPct =
+    answers.length > 0
+      ? Math.round((correctAnswers / answers.length) * 1000) / 10
+      : 0;
+  const avgResponseTimeMs =
+    answers.length > 0
+      ? Math.round(
+          answers.reduce((sum, a) => sum + a.response_time_ms, 0) / answers.length
+        )
+      : 0;
+
+  // Episode status — derived from the same booleans as the legacy counts so
+  // the donut always agrees with the totals above.
+  let live = 0;
+  let ended = 0;
+  let scheduled = 0;
+  for (const ep of episodes) {
+    if (ep.is_live) live += 1;
+    else if (ep.ended_at) ended += 1;
+    else scheduled += 1;
+  }
+
+  const episodeLites = episodes.map((ep) => ({
+    id: ep.id,
+    title: ep.title,
+    status: ep.is_live ? 'live' as const : ep.ended_at ? 'ended' as const : 'scheduled' as const,
+  }));
+  const scoreLites = scores.map((s) => ({
+    user_id: s.user_id,
+    episode_id: s.episode_id,
+  }));
+  const answerLites = answers.map((a) => ({
+    episode_id: a.episode_id,
+    is_correct: a.is_correct,
+  }));
 
   return {
-    totalUsers: usersRes.data.length,
+    totalUsers: users.length,
     newUsersThisWeek,
-    liveEpisodes: episodesRes.data.filter(e => e.is_live).length,
-    upcomingEpisodes: episodesRes.data.filter(e => !e.is_live && !e.ended_at).length,
-    completedEpisodes: episodesRes.data.filter(e => e.ended_at).length,
-    totalAnswers: answersRes.data.length,
-    correctAnswers: answersRes.data.filter(a => a.is_correct).length,
-    totalPhotos: photosRes.data.length,
+    liveEpisodes: live,
+    upcomingEpisodes: scheduled,
+    completedEpisodes: ended,
+    totalAnswers: answers.length,
+    correctAnswers,
+    totalPhotos: photos.length,
     newPhotosThisWeek,
-    totalRecipes: recipesRes.data.length,
-    publishedRecipes: recipesRes.data.filter(r => r.is_published).length,
+    totalRecipes: recipes.length,
+    publishedRecipes: recipes.filter((r) => r.is_published).length,
+
+    newUsersToday,
+    newUsersThisMonth,
+    usersGrowthPct: computeGrowth(currentWeek, previousWeek),
+    activeToday: countActiveUsersToday(answers, scores, photos, now),
+    accuracyPct,
+    avgResponseTimeMs,
+    totalLikes: photos.reduce((sum, p) => sum + (p.like_count ?? 0), 0),
+    totalComments: commentsRes.count ?? 0,
+    totalFollows: followsRes.count ?? 0,
+    totalBadgesAwarded: badgesRes.count ?? 0,
+
+    signupsDaily: buildDailySeries(
+      users.map((u) => ({ createdAt: u.created_at })),
+      days
+    ),
+    signupsSeries: cumulativeWithBaseline(
+      buildDailySeries(users.map((u) => ({ createdAt: u.created_at })), days),
+      users.filter((u) => new Date(u.created_at) < days[0]).length
+    ),
+    answersDaily: buildDailySeries(
+      answers.map((a) => ({ createdAt: a.answered_at })),
+      days
+    ),
+
+    episodeStatus: { scheduled, live, ended },
+
+    topScorers: topScorers.map((p, index) => ({
+      id: p.id,
+      username: p.username,
+      avatar_url: p.avatar_url,
+      xp: p.xp,
+      level_title: p.level_title,
+      total_correct: p.total_correct,
+      episodes_participated: p.episodes_participated,
+      rank: index + 1,
+    })),
+    topEpisodes: buildTopEpisodes(episodeLites, scoreLites, answerLites).slice(0, 5),
   };
 }

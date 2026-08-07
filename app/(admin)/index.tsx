@@ -1,160 +1,97 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useDashboardStats } from '@/lib/api/admin-hooks';
-import { StatCard } from '@/components/admin/StatCard';
+import { StatGrid } from '@/components/admin/dashboard/StatGrid';
+import { SignupGrowthCard } from '@/components/admin/dashboard/SignupGrowthCard';
+import { AnswersPerDayCard } from '@/components/admin/dashboard/AnswersPerDayCard';
+import { EpisodeStatusCard } from '@/components/admin/dashboard/EpisodeStatusCard';
+import { TopScorers } from '@/components/admin/dashboard/TopScorers';
+import { TopEpisodes } from '@/components/admin/dashboard/TopEpisodes';
+import { QuickActions } from '@/components/admin/dashboard/QuickActions';
 
 export default function AdminDashboard() {
   const colors = useColors();
-  const { data: stats, isLoading } = useDashboardStats();
+  const { data: stats, isLoading, isError, refetch, dataUpdatedAt } = useDashboardStats();
 
   return (
     <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Dashboard Overview</Text>
-
-      {/* Stats Cards */}
-      <View style={styles.statsGrid}>
-        <StatCard
-          icon="users"
-          value={stats?.totalUsers || 0}
-          label="Total Users"
-          iconColor={colors.primary}
-          trend={stats?.newUsersThisWeek ? { value: stats.newUsersThisWeek, isPositive: true } : undefined}
-        />
-        <StatCard
-          icon="radio"
-          value={stats?.liveEpisodes || 0}
-          label="Live Now"
-          iconColor={colors.live}
-        />
-        <StatCard
-          icon="calendar"
-          value={stats?.upcomingEpisodes || 0}
-          label="Upcoming"
-          iconColor={colors.accent}
-        />
-        <StatCard
-          icon="check-circle"
-          value={stats?.completedEpisodes || 0}
-          label="Completed"
-          iconColor={colors.success}
-        />
-        <StatCard
-          icon="message-circle"
-          value={stats?.totalAnswers || 0}
-          label="Total Answers"
-          iconColor={colors.warning}
-        />
-        <StatCard
-          icon="image"
-          value={stats?.totalPhotos || 0}
-          label="Community Posts"
-          iconColor={colors.neonRed}
-        />
-        <StatCard
-          icon="book-open"
-          value={stats?.publishedRecipes ?? stats?.totalRecipes ?? 0}
-          label="Published Recipes"
-          iconColor={colors.primary}
-        />
+      {/* Header row */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Dashboard Overview</Text>
+          {dataUpdatedAt > 0 && (
+            <Text style={[styles.lastUpdated, { color: colors.mutedForeground }]}>
+              Updated {new Date(dataUpdatedAt).toLocaleTimeString()}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.refreshBtn, { backgroundColor: colors.surface }]}
+          onPress={() => refetch()}
+          activeOpacity={0.7}
+        >
+          <Feather name="refresh-cw" size={18} color={colors.primary} />
+          <Text style={[styles.refreshLabel, { color: colors.primary }]}>Refresh</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
-        <View style={styles.actionsGrid}>
+      {isLoading ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.centerText, { color: colors.mutedForeground }]}>
+            Loading analytics...
+          </Text>
+        </View>
+      ) : isError || !stats ? (
+        <View style={styles.centerState}>
+          <Feather name="alert-circle" size={56} color={colors.danger} />
+          <Text style={[styles.centerText, { color: colors.mutedForeground }]}>
+            Couldn't load dashboard data.
+          </Text>
           <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/(admin)/episodes' as any)}
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            onPress={() => refetch()}
             activeOpacity={0.8}
           >
-            <Feather name="plus-circle" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Create Episode</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.live }]}
-            onPress={() => router.push('/(admin)/live-control' as any)}
-            activeOpacity={0.8}
-          >
-            <Feather name="radio" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Live Control</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.neonRed }]}
-            onPress={() => router.push('/(admin)/recipes' as any)}
-            activeOpacity={0.8}
-          >
-            <Feather name="book-open" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Manage Recipes</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.warning }]}
-            onPress={() => router.push('/(admin)/announcements' as any)}
-            activeOpacity={0.8}
-          >
-            <Feather name="volume-2" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Announcements</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.accent }]}
-            onPress={() => router.push('/(admin)/community' as any)}
-            activeOpacity={0.8}
-          >
-            <Feather name="users" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Community</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.warning }]}
-            onPress={() => router.push('/(admin)/users' as any)}
-            activeOpacity={0.8}
-          >
-            <Feather name="user" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>Manage Users</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.success }]}
-            onPress={() => router.push('/(admin)/analytics' as any)}
-            activeOpacity={0.8}
-          >
-            <Feather name="trending-up" size={28} color="#fff" />
-            <Text style={styles.actionLabel}>View Analytics</Text>
+            <Text style={styles.retryLabel}>Retry</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      ) : (
+        <>
+          {/* KPI cards */}
+          <StatGrid stats={stats} />
 
-      {/* Engagement Stats */}
-      {stats && stats.totalAnswers > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Engagement</Text>
-          <View style={[styles.engagementCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.engagementRow}>
-              <View style={styles.engagementItem}>
-                <Text style={[styles.engagementValue, { color: colors.success }]}>
-                  {((stats.correctAnswers / stats.totalAnswers) * 100).toFixed(1)}%
-                </Text>
-                <Text style={[styles.engagementLabel, { color: colors.mutedForeground }]}>
-                  Correct Answers
-                </Text>
-              </View>
-              <View style={styles.engagementItem}>
-                <Text style={[styles.engagementValue, { color: colors.primary }]}>
-                  {stats.totalAnswers.toLocaleString()}
-                </Text>
-                <Text style={[styles.engagementLabel, { color: colors.mutedForeground }]}>
-                  Total Responses
-                </Text>
-              </View>
+          {/* Signup growth — full width */}
+          <View style={styles.fullWidth}>
+            <SignupGrowthCard data={stats.signupsSeries} />
+          </View>
+
+          {/* Engagement + episode status side by side */}
+          <View style={styles.chartsRow}>
+            <View style={styles.chartCol}>
+              <AnswersPerDayCard data={stats.answersDaily} />
+            </View>
+            <View style={styles.chartCol}>
+              <EpisodeStatusCard status={stats.episodeStatus} />
             </View>
           </View>
-        </View>
+
+          {/* Rankings */}
+          <TopScorers scorers={stats.topScorers} />
+          <TopEpisodes episodes={stats.topEpisodes} />
+
+          {/* Quick actions */}
+          <QuickActions />
+        </>
       )}
     </ScrollView>
   );
@@ -165,49 +102,62 @@ const styles = StyleSheet.create({
   mainContent: {
     padding: 24,
     paddingTop: Platform.OS === 'web' ? 24 : 60,
+    paddingBottom: 48,
   },
-  pageTitle: { fontSize: 28, fontWeight: '800', marginBottom: 24 },
-  statsGrid: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    gap: 16,
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pageTitle: { fontSize: 28, fontWeight: '800', marginBottom: 4 },
+  lastUpdated: { fontSize: 12 },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  refreshLabel: { fontSize: 13, fontWeight: '700' },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 120,
+    gap: 16,
+  },
+  centerText: {
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  fullWidth: {
+    marginBottom: 16,
+  },
+  chartsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
     marginBottom: 32,
   },
-  section: { marginBottom: 32 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  actionCard: {
+  chartCol: {
     flex: 1,
-    minWidth: 150,
-    padding: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionLabel: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  engagementCard: {
-    padding: 20,
-    borderRadius: 12,
-  },
-  engagementRow: {
-    flexDirection: 'row',
-    gap: 24,
-  },
-  engagementItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  engagementValue: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  engagementLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    minWidth: 320,
   },
 });
