@@ -33,6 +33,8 @@ import { supabase } from '@/lib/supabase';
 import {
   episodeIdFromLiveNotification,
   pushPlatformFor,
+  urlFromAdminNotification,
+  type AdminNotificationData,
   type EpisodeLiveNotificationData,
   type PushPlatform,
 } from './notification-utils';
@@ -65,7 +67,8 @@ function loadNotifications(): Promise<typeof import('expo-notifications')> {
 }
 
 // Re-exported from notification-utils.ts so existing importers keep working.
-export type { PushPlatform, EpisodeLiveNotificationData } from './notification-utils';
+export type { PushPlatform, EpisodeLiveNotificationData, AdminNotificationData } from './notification-utils';
+export { urlFromAdminNotification } from './notification-utils';
 
 /** The EAS project id, used by Expo's servers to mint a push token. */
 const PROJECT_ID =
@@ -228,6 +231,18 @@ export function getEpisodeIdFromNotification(
 ): string | null {
   return episodeIdFromLiveNotification(
     notification.request.content.data as Partial<EpisodeLiveNotificationData> | undefined,
+  );
+}
+
+/**
+ * Extracts the deep link from an admin-scheduled notification payload — returns
+ * `null` for anything that isn't an admin notification or has no link.
+ */
+export function getUrlFromNotification(
+  notification: Notifications.Notification
+): string | null {
+  return urlFromAdminNotification(
+    notification.request.content.data as Partial<AdminNotificationData> | undefined,
   );
 }
 

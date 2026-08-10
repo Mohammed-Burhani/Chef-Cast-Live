@@ -4,6 +4,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as adminApi from './admin';
+import * as adminNotificationsApi from './admin-notifications';
+import { useAuthStore } from '@/store/useAuthStore';
 import { keys } from './hooks';
 
 // ============================================================================
@@ -256,5 +258,94 @@ export function useDashboardStats() {
     queryKey: ['dashboardStats'],
     queryFn: adminApi.getDashboardStats,
     refetchInterval: 60000, // Refetch every minute
+  });
+}
+
+// ============================================================================
+// ADMIN NOTIFICATIONS
+// ============================================================================
+
+const adminNotificationKeys = {
+  all: ['adminNotifications'] as const,
+};
+
+export function useAdminNotifications() {
+  return useQuery({
+    queryKey: adminNotificationKeys.all,
+    queryFn: adminNotificationsApi.fetchAdminNotifications,
+  });
+}
+
+export function useCreateAdminNotification() {
+  const queryClient = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
+
+  return useMutation({
+    mutationFn: (input: adminNotificationsApi.AdminNotificationInput) =>
+      adminNotificationsApi.createAdminNotification(input, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
+    },
+  });
+}
+
+export function useUpdateAdminNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      updates,
+    }: {
+      id: string;
+      updates: Partial<adminNotificationsApi.AdminNotificationInput>;
+    }) => adminNotificationsApi.updateAdminNotification(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
+    },
+  });
+}
+
+export function useDeleteAdminNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => adminNotificationsApi.deleteAdminNotification(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
+    },
+  });
+}
+
+export function useCancelAdminNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => adminNotificationsApi.cancelAdminNotification(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
+    },
+  });
+}
+
+export function useRetryAdminNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => adminNotificationsApi.retryAdminNotification(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
+    },
+  });
+}
+
+export function useSendNowAdminNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => adminNotificationsApi.sendNowAdminNotification(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
+    },
   });
 }

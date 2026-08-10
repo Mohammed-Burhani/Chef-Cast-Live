@@ -26,6 +26,7 @@ import {
   currentPushPlatform,
   getEpisodeIdFromNotification,
   getLastNotificationResponse,
+  getUrlFromNotification,
   initNotifications,
   isExpoGo,
   registerForPushNotificationsAsync,
@@ -45,6 +46,8 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
   const pushTokenRef = useRef<string | null>(null);
   // Episode we still need to open (set on tap / cold start, waits for auth).
   const pendingEpisodeIdRef = useRef<string | null>(null);
+  // Deep link from an admin-scheduled notification (e.g. /episode/<id>).
+  const pendingUrlRef = useRef<string | null>(null);
 
   // ── 0) Set the foreground notification handler once at startup ────────────
   useEffect(() => {
@@ -87,7 +90,12 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
 
     addNotificationResponseListener((notification) => {
       const episodeId = getEpisodeIdFromNotification(notification);
-      if (episodeId) pendingEpisodeIdRef.current = episodeId;
+      if (episodeId) {
+        pendingEpisodeIdRef.current = episodeId;
+      } else {
+        const url = getUrlFromNotification(notification);
+        if (url) pendingUrlRef.current = url;
+      }
     }).then((sub) => {
       if (cancelled) {
         sub?.remove();
@@ -112,7 +120,12 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
       .then((notification) => {
         if (cancelled || !notification) return;
         const episodeId = getEpisodeIdFromNotification(notification);
-        if (episodeId) pendingEpisodeIdRef.current = episodeId;
+        if (episodeId) {
+          pendingEpisodeIdRef.current = episodeId;
+        } else {
+          const url = getUrlFromNotification(notification);
+          if (url) pendingUrlRef.current = url;
+        }
       })
       .catch(() => {
         // Not supported on every platform — safe to ignore.
@@ -128,10 +141,17 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
     if (loading || !isLoggedIn) return;
 
     const episodeId = pendingEpisodeIdRef.current;
-    if (!episodeId) return;
+    const url = pendingUrlRef.current;
+    if (!episodeId && !url) return;
 
     pendingEpisodeIdRef.current = null;
-    router.push(`/episode/${episodeId}` as never);
+    pendingUrlRef.current = null;
+
+    if (episodeId) {
+      router.push(`/episode/${episodeId}` as never);
+    } else {
+      router.push(url as never);
+    }
   }, [loading, isLoggedIn, router]);
 
   return <>{children}</>;

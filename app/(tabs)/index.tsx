@@ -24,13 +24,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { AnnouncementsDrawer } from "@/components/ui/AnnouncementsDrawer";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
 import { useUnseenAnnouncementCount } from "@/store/useAnnouncementReadStore";
 import { useEpisodeStore } from "@/store/episodeStore";
-import { useLiveEpisode, useEpisodes, useDishPhotos, useRecipes, useAnnouncements, keys } from "@/lib/api/hooks";
+import { useLiveEpisode, useEpisodes, useDishPhotos, useRecipes, useAnnouncements, useUnreadNotificationCount, keys } from "@/lib/api/hooks";
 import { useUpcomingEpisodes, liveKeys } from "@/lib/api/live";
 import { useUserStats } from "@/lib/api/scoring";
 import { useEpisodeFeedEvents } from "@/lib/realtime/hooks";
@@ -156,7 +155,6 @@ export default function HomeScreen() {
   const { data: stats } = useUserStats(user?.id);
   const xpTotal = stats?.xp ?? 0;
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
-  const [notifOpen, setNotifOpen] = React.useState(false);
   const queryClient = useQueryClient();
 
   // Live episodes we watched flip from a reminder during this session. Keeps
@@ -191,7 +189,9 @@ export default function HomeScreen() {
   const { data: soonLive } = useUpcomingEpisodes();
   const { data: recipes = [] } = useRecipes();
   const { data: announcements = [] } = useAnnouncements();
-  const unseenCount = useUnseenAnnouncementCount(announcements);
+  const { data: unreadNotifications = 0 } = useUnreadNotificationCount();
+  // Badge = unseen announcements + unread personalized notifications.
+  const unseenCount = useUnseenAnnouncementCount(announcements) + unreadNotifications;
   const railEpisodes = buildUpcomingRail(soonLive, transitionedLiveIds);
   const topRecipes = recipes.slice(0, 8);
 
@@ -261,7 +261,7 @@ export default function HomeScreen() {
               <StreakFlame streak={currentStreak} size="sm" />
               <TouchableOpacity
                 style={[styles.notifBtn, { backgroundColor: colors.surface }]}
-                onPress={() => setNotifOpen(true)}
+                onPress={() => router.push('/notifications' as never)}
                 activeOpacity={0.7}
               >
                 <Feather name="bell" size={18} color={colors.foreground} />
@@ -639,13 +639,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Notifications drawer — announcements */}
-      <AnnouncementsDrawer
-        visible={notifOpen}
-        onClose={() => setNotifOpen(false)}
-        announcements={announcements}
-      />
     </SafeAreaView>
   );
 }

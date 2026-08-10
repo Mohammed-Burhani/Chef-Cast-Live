@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from './supabase';
 import * as recipesApi from './recipes';
 import * as announcementsApi from './announcements';
+import * as userNotificationsApi from './notifications';
 import { supabase } from '@/lib/supabase';
 
 // ============================================================================
@@ -343,6 +344,88 @@ export function useDeleteAnnouncement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: announcementKeys.all });
       queryClient.invalidateQueries({ queryKey: announcementKeys.admin });
+    },
+  });
+}
+
+// ============================================================================
+// USER NOTIFICATIONS
+// ============================================================================
+
+export const notificationKeys = {
+  mine: ['notifications', 'mine'] as const,
+  unreadCount: ['notifications', 'unread-count'] as const,
+};
+
+/**
+ * The current user's notifications (admin-scheduled deliveries). Subscribes to
+ * realtime so a freshly-sent notification appears without a manual refresh.
+ */
+export function useMyNotifications() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('my-notifications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notification_deliveries' }, () => {
+        queryClient.invalidateQueries({ queryKey: notificationKeys.mine });
+        queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return useQuery({
+    queryKey: notificationKeys.mine,
+    queryFn: userNotificationsApi.fetchMyNotifications,
+  });
+}
+
+export function useUnreadNotificationCount() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('my-notifications-count')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notification_deliveries' }, () => {
+        queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return useQuery({
+    queryKey: notificationKeys.unreadCount,
+    queryFn: userNotificationsApi.fetchUnreadNotificationCount,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => userNotificationsApi.markNotificationRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.mine });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => userNotificationsApi.markAllNotificationsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.mine });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount });
     },
   });
 }

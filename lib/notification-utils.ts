@@ -35,3 +35,24 @@ export function pushPlatformFor(platformOs: string): PushPlatform {
   if (platformOs === 'web') return 'web';
   return 'ios';
 }
+
+/** Payload attached to an admin-scheduled push (also delivered to the web SW). */
+export interface AdminNotificationData {
+  type: 'admin-notification';
+  notificationId: string;
+  /** Relative URL used to open the linked screen (e.g. /episode/<id>). */
+  url?: string;
+}
+
+/**
+ * Extracts the deep link from an admin-notification payload — returns `null`
+ * for any notification that isn't an "admin notification" alert or that has no
+ * link attached.
+ */
+export function urlFromAdminNotification(
+  data: Partial<AdminNotificationData> | null | undefined,
+): string | null {
+  if (!data || data.type !== 'admin-notification') return null;
+  if (typeof data.url === 'string' && data.url.trim()) return data.url.trim();
+  return null;
+}

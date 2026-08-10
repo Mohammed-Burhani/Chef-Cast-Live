@@ -681,6 +681,116 @@ export interface Database {
           }
         ]
       }
+      admin_notifications: {
+        Row: {
+          id: string
+          title: string
+          body: string
+          target_type: 'all' | 'specific'
+          target_user_ids: string[] | null
+          deep_link: string | null
+          scheduled_at: string
+          status: 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed'
+          sent_at: string | null
+          sent_count: number
+          error: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          body: string
+          target_type?: 'all' | 'specific'
+          target_user_ids?: string[] | null
+          deep_link?: string | null
+          scheduled_at: string
+          status?: 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed'
+          sent_at?: string | null
+          sent_count?: number
+          error?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          body?: string
+          target_type?: 'all' | 'specific'
+          target_user_ids?: string[] | null
+          deep_link?: string | null
+          scheduled_at?: string
+          status?: 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed'
+          sent_at?: string | null
+          sent_count?: number
+          error?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_created_by_fkey"
+            columns: ["created_by"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      notification_deliveries: {
+        Row: {
+          id: string
+          notification_id: string
+          user_id: string
+          title: string
+          body: string
+          deep_link: string | null
+          push_status: 'pending' | 'sent' | 'failed' | 'no_token'
+          is_read: boolean
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          notification_id: string
+          user_id: string
+          title: string
+          body: string
+          deep_link?: string | null
+          push_status?: 'pending' | 'sent' | 'failed' | 'no_token'
+          is_read?: boolean
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          notification_id?: string
+          user_id?: string
+          title?: string
+          body?: string
+          deep_link?: string | null
+          push_status?: 'pending' | 'sent' | 'failed' | 'no_token'
+          is_read?: boolean
+          read_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            referencedRelation: "admin_notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_deliveries_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
