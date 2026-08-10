@@ -616,6 +616,24 @@ export interface Database {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          key: string
+          value: Json
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: Json
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           id: string
@@ -796,7 +814,22 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_app_setting: {
+        Args: { p_key: string }
+        Returns: Json
+      }
+      get_app_setting_bool: {
+        Args: { p_key: string; p_default?: boolean }
+        Returns: boolean
+      }
+      get_cron_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          jobname: string
+          schedule: string
+          command: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -2,9 +2,12 @@
  * Admin React Query hooks
  */
 
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import * as adminApi from './admin';
 import * as adminNotificationsApi from './admin-notifications';
+import * as settingsApi from './settings';
 import { useAuthStore } from '@/store/useAuthStore';
 import { keys } from './hooks';
 
@@ -347,5 +350,78 @@ export function useSendNowAdminNotification() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminNotificationKeys.all });
     },
+  });
+}
+
+// ============================================================================
+// APP SETTINGS
+// ============================================================================
+
+export const settingsKeys = {
+  all: ['appSettings'] as const,
+  cron: ['appSettings', 'cron'] as const,
+  system: ['appSettings', 'system'] as const,
+};
+
+// realtime-js deduplicates channels by topic name, and `useAppSettings` can be
+// mounted more than once (admin sidebar + settings screen). A per-instance
+// counter keeps each subscription on its own topic so `.on()` is never called
+// on an already-subscribed channel (which throws).
+let appSettingsTopicId = 0;
+
+/**
+ * Current app settings (admin-configured). Subscribes to realtime so a change
+ * made in one browser tab / device propagates to this screen live.
+ */
+export function useAppSettings() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const topic = `app-settings:${++appSettingsTopicId}`;
+    const channel = supabase
+      .channel(topic)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => {
+        queryClient.invalidateQueries({ queryKey: settingsKeys.all });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return useQuery({
+    queryKey: settingsKeys.all,
+    queryFn: settingsApi.fetchAppSettings,
+  });
+}
+
+export function useUpdateAppSetting() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ key, value }: { key: keyof settingsApi.AppSettings; value: string | boolean }) =>
+      settingsApi.updateAppSetting(key, value),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: settingsKeys.all });
+    },
+  });
+}
+
+/** Installed pg_cron jobs (verifies the schedulers are alive). */
+export function useCronStatus() {
+  return useQuery({
+    queryKey: settingsKeys.cron,
+    queryFn: settingsApi.fetchCronStatus,
+    staleTime: 60_000,
+  });
+}
+
+/** Live DB ping + row counts for the System section. */
+export function useSystemSnapshot() {
+  return useQuery({
+    queryKey: settingsKeys.system,
+    queryFn: settingsApi.fetchSystemSnapshot,
+    refetchInterval: 60_000,
   });
 }

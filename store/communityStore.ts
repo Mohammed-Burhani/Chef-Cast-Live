@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import * as commentApi from '@/lib/api/comments';
 import { uploadDishPhoto, toggleLikeDishPhoto, uploadLocalDishPhoto } from '@/lib/api/supabase';
+import { fetchSettingBool } from '@/lib/api/settings';
 
 interface CommunityState {
   // Posts
@@ -194,6 +195,11 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
   },
 
   createPost: async (postData) => {
+    // Admin can disable dish-photo posting app-wide via Settings → Community.
+    if (!(await fetchSettingBool('allow_dish_photos'))) {
+      throw new Error('Posting is currently disabled by the admin.');
+    }
+
     const imageUrl = await ensureStoredImageUrl(postData.photoUrl);
     await uploadDishPhoto({ imageUrl, caption: postData.caption });
     await get().loadPosts('all');
@@ -255,6 +261,11 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
   addComment: async (postId: string, text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // Admin can disable comments app-wide via Settings → Community.
+    if (!(await fetchSettingBool('allow_comments'))) {
+      throw new Error('Comments are currently disabled by the admin.');
+    }
 
     try {
       const row = await commentApi.addPostComment(postId, trimmed);

@@ -7,6 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React, { useState } from "react";
 import {
+  Alert,
   Modal,
   Platform,
   ScrollView,
@@ -56,8 +57,12 @@ export function CommentsSheet({ visible, postId, onClose }: CommentsSheetProps) 
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
 
-    await addComment(postId, newComment.trim());
-    setNewComment("");
+    try {
+      await addComment(postId, newComment.trim());
+      setNewComment("");
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to add comment");
+    }
   };
 
   const timeAgo = (dateStr: string) => {

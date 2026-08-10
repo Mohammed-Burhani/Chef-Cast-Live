@@ -4,6 +4,7 @@ import { router, usePathname } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useAppSettings } from '@/lib/api/admin-hooks';
 
 type NavItem = {
   id: string;
@@ -29,6 +30,8 @@ export function AdminSidebar() {
   const colors = useColors();
   const { user, logout } = useAuthStore();
   const pathname = usePathname();
+  const { data: settings } = useAppSettings();
+  const brandName = settings?.app_display_name || 'Foodilicious';
 
   const handleLogout = async () => {
     await logout();
@@ -57,7 +60,7 @@ export function AdminSidebar() {
         <View style={[styles.logo, { backgroundColor: colors.primary }]}>
           <Feather name="zap" size={24} color="#fff" />
         </View>
-        <Text style={[styles.logoText, { color: colors.foreground }]}>Foodilicious Admin</Text>
+        <Text style={[styles.logoText, { color: colors.foreground }]}>{brandName} Admin</Text>
       </View>
 
       <ScrollView style={styles.nav} contentContainerStyle={styles.navContent} showsVerticalScrollIndicator={false}>

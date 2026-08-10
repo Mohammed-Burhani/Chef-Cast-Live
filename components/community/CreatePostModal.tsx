@@ -124,7 +124,7 @@ export function CreatePostModal({ visible, onClose }: CreatePostModalProps) {
       }
     } catch (error) {
       setIsSubmitting(false);
-      Alert.alert("Error", "Failed to create post");
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to create post");
     }
   };
 
