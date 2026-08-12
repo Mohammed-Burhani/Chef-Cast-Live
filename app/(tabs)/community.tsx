@@ -1,15 +1,17 @@
 /**
  * Community Feed screen — Instagram-like feed with stories, posts, and social interactions
- * Features: Stories bar, post feed, like/comment/share/save functionality
+ * Features: grouped stories bar, curated feed (algorithm), like/comment/share/save,
+ * infinite scroll via FlatList.
  */
 
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  FlatList,
   Modal,
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -26,37 +28,47 @@ import { CommentsSheet } from "@/components/community/CommentsSheet";
 import { UserProfile } from "@/components/community/UserProfile";
 import { StoryViewer } from "@/components/community/StoryViewer";
 import { CreateStoryModal } from "@/components/community/CreateStoryModal";
-import { Story, CommunityPost } from "@/types";
-
-type FilterType = "all" | "following";
+import { ReportModal } from "@/components/community/ReportModal";
+import { Story, StoryGroup } from "@/types";
 
 export default function CommunityScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const posts = useCommunityStore((s) => s.posts);
-  const isLoadingPosts = useCommunityStore((s) => s.isLoadingPosts);
-  const loadPosts = useCommunityStore((s) => s.loadPosts);
+  const feedPosts = useCommunityStore((s) => s.feedPosts);
+  const isLoadingFeed = useCommunityStore((s) => s.isLoadingFeed);
+  const isLoadingMoreFeed = useCommunityStore((s) => s.isLoadingMoreFeed);
+  const feedHasMore = useCommunityStore((s) => s.feedHasMore);
+  const loadFeed = useCommunityStore((s) => s.loadFeed);
+  const loadMoreFeed = useCommunityStore((s) => s.loadMoreFeed);
   const toggleLike = useCommunityStore((s) => s.toggleLike);
   const toggleSave = useCommunityStore((s) => s.toggleSave);
   const viewStory = useCommunityStore((s) => s.viewStory);
-  const stories = useCommunityStore((s) => s.stories);
+  const storyGroups = useCommunityStore((s) => s.storyGroups);
+  const loadStories = useCommunityStore((s) => s.loadStories);
 
-  const [filter, setFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showStoryViewer, setShowStoryViewer] = useState(false);
-  const [storyViewerIndex, setStoryViewerIndex] = useState(0);
+  const [viewerStories, setViewerStories] = useState<Story[]>([]);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [reportPostId, setReportPostId] = useState<string | null>(null);
+
+  // Initial load: curated feed + stories.
+  useEffect(() => {
+    loadFeed();
+    loadStories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadPosts(filter);
+    await Promise.all([loadFeed(true), loadStories()]);
     setRefreshing(false);
   };
 
@@ -88,112 +100,92 @@ export default function CommunityScreen() {
     console.log("Navigate to hashtag:", tag);
   };
 
-  const handleStoryPress = (story: Story) => {
-    const stories = useCommunityStore.getState().stories;
-    const index = stories.findIndex(s => s.id === story.id);
-    setStoryViewerIndex(index >= 0 ? index : 0);
+  const handleReport = (postId: string) => {
+    setReportPostId(postId);
+  };
+
+  const handleStoryPress = (group: StoryGroup) => {
+    setViewerStories(group.stories);
     setShowStoryViewer(true);
-    viewStory(story.id);
   };
 
   const handleCreateStory = () => {
     setShowCreateStory(true);
   };
 
-  const FILTERS: Array<{ id: FilterType; label: string }> = [
-    { id: "all", label: "All" },
-    { id: "following", label: "Following" },
-  ];
+  const header = (
+    <>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : 0 }]}>
+        <Text style={[styles.title, { color: colors.foreground }]}>Community</Text>
+        <TouchableOpacity
+          onPress={() => setShowCreatePost(true)}
+          style={[styles.createPostBtn, { backgroundColor: colors.primary }]}
+        >
+          <Feather name="plus" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
-  const filteredPosts = filter === "following" 
-    ? posts.filter(post => {
-        const following = useCommunityStore.getState().following;
-        return following.includes(post.userId);
-      })
-    : posts;
+      {/* Stories Bar */}
+      <StoriesBar onStoryPress={handleStoryPress} onCreateStory={handleCreateStory} />
+    </>
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
-      <ScrollView
-        style={styles.scroll}
+      <FlatList
+        style={styles.list}
         contentContainerStyle={{ paddingBottom: bottomPadding + 80 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
-        }
-      >
-        {/* Header */}
-        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 : 0 }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Community</Text>
-          <TouchableOpacity
-            onPress={() => setShowCreatePost(true)}
-            style={[styles.createPostBtn, { backgroundColor: colors.primary }]}
-          >
-            <Feather name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter bar */}
-        <View style={styles.filterBar}>
-          {FILTERS.map((f) => (
-            <TouchableOpacity
-              key={f.id}
-              onPress={() => {
-                setFilter(f.id);
-                loadPosts(f.id);
-              }}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: filter === f.id ? colors.primary : colors.surface,
-                  borderColor: filter === f.id ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.filterLabel,
-                  { color: filter === f.id ? "#fff" : colors.mutedForeground },
-                ]}
-              >
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Stories Bar */}
-        <StoriesBar
-          onStoryPress={handleStoryPress}
-          onCreateStory={handleCreateStory}
-        />
-
-        {/* Posts Feed */}
-        {filteredPosts.map((post) => (
+        data={feedPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
           <PostCard
-            key={post.id}
-            post={post}
+            post={item}
             onLike={handleLike}
             onComment={handleComment}
             onShare={handleShare}
             onSave={handleSave}
             onUserPress={handleUserPress}
             onHashtagPress={handleHashtagPress}
+            onReport={handleReport}
           />
-        ))}
-
-        {filteredPosts.length === 0 && !isLoadingPosts && (
-          <View style={styles.emptyState}>
-            <Feather name="users" size={48} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              No posts yet
-            </Text>
-            <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
-              Be the first to share your culinary creation!
-            </Text>
-          </View>
         )}
-      </ScrollView>
+        ListHeaderComponent={header}
+        ListFooterComponent={
+          isLoadingMoreFeed ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : !feedHasMore && feedPosts.length > 0 ? (
+            <Text style={[styles.endText, { color: colors.mutedForeground }]}>
+              You're all caught up 🎉
+            </Text>
+          ) : null
+        }
+        ListEmptyComponent={
+          isLoadingFeed ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Feather name="users" size={48} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                No posts yet
+              </Text>
+              <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
+                Be the first to share your culinary creation!
+              </Text>
+            </View>
+          )
+        }
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+        }
+        onEndReached={() => loadMoreFeed()}
+        onEndReachedThreshold={0.5}
+      />
 
       {/* Create Post Modal */}
       <CreatePostModal
@@ -206,6 +198,16 @@ export default function CommunityScreen() {
         visible={showCreateStory}
         onClose={() => setShowCreateStory(false)}
       />
+
+      {/* Report Modal */}
+      {reportPostId && (
+        <ReportModal
+          visible={!!reportPostId}
+          targetType="post"
+          targetId={reportPostId}
+          onClose={() => setReportPostId(null)}
+        />
+      )}
 
       {/* Comments Sheet */}
       {selectedPostId && (
@@ -243,10 +245,11 @@ export default function CommunityScreen() {
       {/* Story Viewer */}
       <StoryViewer
         visible={showStoryViewer}
-        stories={stories}
-        initialIndex={storyViewerIndex}
+        stories={viewerStories}
+        initialIndex={0}
         onClose={() => setShowStoryViewer(false)}
         onUserPress={handleUserPress}
+        onStoryViewed={viewStory}
       />
     </SafeAreaView>
   );
@@ -256,10 +259,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scroll: {
+  list: {
     flex: 1,
-    // maxWidth: "70%",
-    alignSelf: "center"
+    alignSelf: "center",
+    width: "100%",
   },
   header: {
     flexDirection: "row",
@@ -279,19 +282,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  filterBar: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 8,
+  footerLoader: {
+    paddingVertical: 24,
+    alignItems: "center",
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterLabel: {
+  endText: {
+    textAlign: "center",
+    paddingVertical: 24,
     fontSize: 14,
     fontWeight: "600",
   },

@@ -203,6 +203,16 @@ export default function ProfileScreen() {
 
         <View style={[styles.settingsSection, { backgroundColor: colors.surface }]}>
           <Text style={[styles.settingsSectionTitle, { color: colors.mutedForeground }]}>ACCOUNT</Text>
+          <SettingRow
+            icon="bookmark"
+            label="Saved"
+            onPress={() => router.push("/settings?tab=saved" as never)}
+          />
+          <SettingRow
+            icon="activity"
+            label="Activities"
+            onPress={() => router.push("/settings?tab=activities" as never)}
+          />
           <SettingRow icon="shield" label="Privacy" onPress={() => {}} />
           <SettingRow icon="help-circle" label="Help & Support" onPress={() => {}} />
           <SettingRow icon="info" label="About Foodilicious" value="v1.0.0" onPress={() => {}} />

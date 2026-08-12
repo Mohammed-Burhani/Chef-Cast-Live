@@ -20,8 +20,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useAuthStore } from "@/store/useAuthStore";
 import { useCommunityStore } from "@/store/communityStore";
+import { uploadStoryMedia } from "@/lib/api/community";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface CreateStoryModalProps {
@@ -32,7 +32,6 @@ interface CreateStoryModalProps {
 export function CreateStoryModal({ visible, onClose }: CreateStoryModalProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const user = useAuthStore((s) => s.user);
   const createStory = useCommunityStore((s) => s.createStory);
 
   const [mediaUri, setMediaUri] = useState<string | null>(null);
@@ -92,12 +91,10 @@ export function CreateStoryModal({ visible, onClose }: CreateStoryModalProps) {
 
     try {
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const mediaUrl = await uploadStoryMedia(mediaUri);
 
       await createStory({
-        userId: user?.id || "me",
-        username: user?.username || "you",
-        avatarUrl: user?.avatarUrl,
-        mediaUrl: mediaUri,
+        mediaUrl,
         mediaType,
         caption: caption.trim() || undefined,
         expiresAt: expiresAt.toISOString(),

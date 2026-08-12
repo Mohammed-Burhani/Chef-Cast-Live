@@ -2,46 +2,58 @@
  * ============================================================================
  * COMMUNITY STORE
  * ============================================================================
- * Posts + comments are backed by Supabase (real data + realtime).
+ * Posts, comments, saves, and stories are backed by Supabase.
  *
- *   - Posts      : dish_photos rows (profiles + comment count + liked state)
- *   - Comments   : post_comments via lib/api/comments (RPCs + postgres_changes)
- *   - Stories    : prototype/mock (community module not built yet)
- *   - Follows    : prototype/mock (community module not built yet)
- *
- * Realtime: subscribeToComments() opens a postgres_changes channel filtered to
- * the open post's id; new INSERT events refresh the comment list in place so an
- * open CommentsSheet updates live without a manual reload.
+ *   - Feed posts  : get_community_feed RPC — the per-user curated algorithm
+ *                   (content + engagement + daily variation) with infinite
+ *                   scroll. Feed reorders daily and adapts to new likes/saves.
+ *   - Latest posts: dish_photos (newest-first) — used by the admin moderation
+ *                   page, kept separate from the personalized feed.
+ *   - Comments    : post_comments via lib/api/comments (no realtime).
+ *   - Saves       : post_saves via lib/api/community (persisted bookmarks).
+ *   - Stories     : stories + story_views via lib/api/community, grouped by
+ *                   author for the stories bar.
+ *   - Follows     : not built yet (out of scope for Community Mode).
  */
 
 import { create } from 'zustand';
-import { RealtimeChannel } from '@supabase/supabase-js';
-import { CommunityPost, Comment, Story } from '@/types';
+import { CommunityPost, Comment, Story, StoryGroup } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import * as commentApi from '@/lib/api/comments';
+import * as communityApi from '@/lib/api/community';
 import { uploadDishPhoto, toggleLikeDishPhoto, uploadLocalDishPhoto } from '@/lib/api/supabase';
 import { fetchSettingBool } from '@/lib/api/settings';
 
+const FEED_PAGE_SIZE = 10;
+const MAX_SEEN_IDS = 300;
+
 interface CommunityState {
-  // Posts
+  // Latest posts (admin moderation) — newest-first, not personalized.
   posts: CommunityPost[];
   isLoadingPosts: boolean;
+
+  // Curated feed (infinite scroll)
+  feedPosts: CommunityPost[];
+  feedPage: number;
+  feedHasMore: boolean;
+  isLoadingFeed: boolean;
+  isLoadingMoreFeed: boolean;
+  feedSeenIds: string[];
 
   // Comments
   comments: Comment[];
   isLoadingComments: boolean;
 
-  // Stories
+  // Stories (grouped by author for the bar)
   stories: Story[];
+  storyGroups: StoryGroup[];
   isLoadingStories: boolean;
 
-  // Follows
-  following: string[];
-  followers: string[];
-
   // Actions
-  loadPosts: (filter?: 'all' | 'following') => Promise<void>;
+  loadPosts: () => Promise<void>;
+  loadFeed: (reset?: boolean) => Promise<void>;
+  loadMoreFeed: () => Promise<void>;
   createPost: (post: Omit<CommunityPost, 'id' | 'likes' | 'isLiked' | 'comments' | 'shares' | 'createdAt'>) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
   toggleSave: (postId: string) => Promise<void>;
@@ -49,74 +61,12 @@ interface CommunityState {
   loadComments: (postId: string) => Promise<void>;
   addComment: (postId: string, text: string) => Promise<void>;
   toggleLikeComment: (commentId: string) => Promise<void>;
-  subscribeToComments: (postId: string) => void;
-  unsubscribeFromComments: () => void;
 
   loadStories: () => Promise<void>;
-  createStory: (story: Omit<Story, 'id' | 'viewers' | 'isViewed' | 'createdAt'>) => Promise<void>;
+  createStory: (storyData: { mediaUrl: string; mediaType: 'image' | 'video'; caption?: string; expiresAt: string }) => Promise<void>;
   viewStory: (storyId: string) => Promise<void>;
 
-  toggleFollow: (userId: string) => Promise<void>;
-  loadUserRelations: (userId: string) => Promise<void>;
-
   reset: () => void;
-}
-
-// Mock stories for prototype (community module not built yet)
-const MOCK_STORIES: Story[] = [
-  {
-    id: 'story-1',
-    userId: 'user-1',
-    username: 'chef_marco',
-    avatarUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&h=100&fit=crop',
-    mediaUrl: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800',
-    mediaType: 'image',
-    caption: 'Behind the scenes at the restaurant today! 🎬',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23).toISOString(),
-    viewers: ['user-2', 'user-3'],
-    isViewed: false,
-  },
-  {
-    id: 'story-2',
-    userId: 'user-2',
-    username: 'foodie_sara',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
-    mediaUrl: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800',
-    mediaType: 'image',
-    caption: 'Cooking up something special! Stay tuned 👀',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 23.5).toISOString(),
-    viewers: [],
-    isViewed: false,
-  },
-  {
-    id: 'story-3',
-    userId: 'user-4',
-    username: 'baking_queen',
-    avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
-    mediaUrl: 'https://images.unsplash.com/photo-1509365465985-25d11c17e812?w=800',
-    mediaType: 'image',
-    caption: 'Fresh bread day! 🍞✨',
-    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 22).toISOString(),
-    viewers: ['user-1', 'user-2', 'user-3'],
-    isViewed: true,
-  },
-];
-
-// Single live channel for the currently open comment sheet.
-let commentsChannel: RealtimeChannel | null = null;
-
-/** Silently re-fetch comments (used by realtime) without toggling the loader. */
-async function refreshComments(postId: string) {
-  try {
-    const rows = await commentApi.fetchPostComments(postId);
-    const comments: Comment[] = rows.map(mapCommentRow);
-    useCommunityStore.setState({ comments });
-  } catch (error) {
-    console.error('[Community] Refresh comments error:', error);
-  }
 }
 
 function mapCommentRow(row: commentApi.PostCommentRow): Comment {
@@ -133,19 +83,38 @@ function mapCommentRow(row: commentApi.PostCommentRow): Comment {
   };
 }
 
+/** Group stories by author (one ring per user in the stories bar). */
+function buildStoryGroups(stories: Story[]): StoryGroup[] {
+  const map = new Map<string, StoryGroup>();
+  for (const story of stories) {
+    let group = map.get(story.userId);
+    if (!group) {
+      group = { userId: story.userId, username: story.username, avatarUrl: story.avatarUrl, stories: [] };
+      map.set(story.userId, group);
+    }
+    group.stories.push(story);
+  }
+  return Array.from(map.values());
+}
+
 export const useCommunityStore = create<CommunityState>()((set, get) => ({
   // Initial state
   posts: [],
   isLoadingPosts: false,
+  feedPosts: [],
+  feedPage: 0,
+  feedHasMore: true,
+  isLoadingFeed: false,
+  isLoadingMoreFeed: false,
+  feedSeenIds: [],
   comments: [],
   isLoadingComments: false,
-  stories: MOCK_STORIES,
+  stories: [],
+  storyGroups: [],
   isLoadingStories: false,
-  following: ['user-1', 'user-2', 'user-4'],
-  followers: ['user-2', 'user-3', 'user-5'],
 
-  // Posts
-  loadPosts: async (filter = 'all') => {
+  // Latest posts (admin moderation page)
+  loadPosts: async () => {
     set({ isLoadingPosts: true });
     try {
       const userId = useAuthStore.getState().user?.id;
@@ -157,6 +126,8 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
           user_id,
           image_url,
           caption,
+          location,
+          tags,
           like_count,
           created_at,
           profiles:user_id ( username, avatar_url ),
@@ -168,24 +139,21 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
 
       if (error) throw error;
 
-      let posts: CommunityPost[] = (data || []).map((row: any) => ({
+      const posts: CommunityPost[] = (data || []).map((row: any) => ({
         id: row.id,
         userId: row.user_id,
         username: row.profiles?.username ?? 'Unknown',
         avatarUrl: row.profiles?.avatar_url ?? undefined,
         photoUrl: row.image_url,
         caption: row.caption ?? '',
+        location: row.location ?? undefined,
+        tags: row.tags ?? [],
         likes: row.like_count ?? 0,
         isLiked: !!(row.dish_photo_likes ?? []).some((like: any) => like.user_id === userId),
         comments: (row.post_comments ?? []).length,
         shares: 0,
         createdAt: row.created_at,
       }));
-
-      if (filter === 'following') {
-        const following = get().following;
-        posts = posts.filter((post) => following.includes(post.userId));
-      }
 
       set({ posts, isLoadingPosts: false });
     } catch (error) {
@@ -194,55 +162,118 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
     }
   },
 
+  // Curated feed with infinite scroll
+  loadFeed: async (reset = false) => {
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId) return;
+
+    if (reset) {
+      // Reset wipes any in-flight state so a refresh always restarts cleanly.
+      set({
+        feedPosts: [],
+        feedPage: 0,
+        feedHasMore: true,
+        feedSeenIds: [],
+        isLoadingFeed: false,
+        isLoadingMoreFeed: false,
+      });
+    } else if (get().isLoadingFeed || get().isLoadingMoreFeed) {
+      return;
+    }
+
+    const page = get().feedPage;
+    const seen = get().feedSeenIds;
+    set({ isLoadingFeed: page === 0, isLoadingMoreFeed: page > 0 });
+
+    try {
+      const rows = await communityApi.fetchCommunityFeed({
+        userId,
+        limit: FEED_PAGE_SIZE,
+        offset: page * FEED_PAGE_SIZE,
+        seenIds: seen.slice(-MAX_SEEN_IDS),
+      });
+      const mapped = rows.map(communityApi.mapFeedRowToPost);
+
+      set((state) => ({
+        feedPosts: page === 0 ? mapped : [...state.feedPosts, ...mapped],
+        feedPage: page + 1,
+        feedHasMore: mapped.length === FEED_PAGE_SIZE,
+        feedSeenIds: [...state.feedSeenIds, ...mapped.map((p) => p.id)].slice(-MAX_SEEN_IDS),
+        isLoadingFeed: false,
+        isLoadingMoreFeed: false,
+      }));
+    } catch (error) {
+      console.error('[Community] Load feed error:', error);
+      set({ isLoadingFeed: false, isLoadingMoreFeed: false });
+    }
+  },
+
+  loadMoreFeed: async () => {
+    if (get().isLoadingFeed || get().isLoadingMoreFeed || !get().feedHasMore) return;
+    await get().loadFeed(false);
+  },
+
   createPost: async (postData) => {
     // Admin can disable dish-photo posting app-wide via Settings → Community.
     if (!(await fetchSettingBool('allow_dish_photos'))) {
       throw new Error('Posting is currently disabled by the admin.');
     }
 
-    const imageUrl = await ensureStoredImageUrl(postData.photoUrl);
-    await uploadDishPhoto({ imageUrl, caption: postData.caption });
-    await get().loadPosts('all');
+    try {
+      const imageUrl = await ensureStoredImageUrl(postData.photoUrl);
+      await uploadDishPhoto({
+        imageUrl,
+        caption: postData.caption,
+        tags: postData.tags,
+        location: postData.location,
+      });
+      await get().loadFeed(true);
+    } catch (error) {
+      if (isSuspendedError(error)) {
+        throw new Error('Your account has been suspended and can no longer post.');
+      }
+      throw error;
+    }
   },
 
   toggleLike: async (postId: string) => {
-    const post = get().posts.find((p) => p.id === postId);
+    const post =
+      get().feedPosts.find((p) => p.id === postId) ?? get().posts.find((p) => p.id === postId);
     if (!post) return;
 
     const nextLiked = !post.isLiked;
+    const patch = (p: CommunityPost) =>
+      p.id === postId
+        ? { ...p, isLiked: nextLiked, likes: Math.max(0, p.likes + (nextLiked ? 1 : -1)) }
+        : p;
+
     // Optimistic update
-    set((state) => ({
-      posts: state.posts.map((p) =>
-        p.id === postId
-          ? { ...p, isLiked: nextLiked, likes: Math.max(0, p.likes + (nextLiked ? 1 : -1)) }
-          : p
-      ),
-    }));
+    set((state) => ({ feedPosts: state.feedPosts.map(patch), posts: state.posts.map(patch) }));
 
     try {
       await toggleLikeDishPhoto(postId);
     } catch (error) {
       console.error('[Community] Toggle like error:', error);
-      // Revert on failure
-      set((state) => ({
-        posts: state.posts.map((p) =>
-          p.id === postId
-            ? { ...p, isLiked: !nextLiked, likes: Math.max(0, p.likes + (nextLiked ? -1 : 1)) }
-            : p
-        ),
-      }));
+      const revert = (p: CommunityPost) =>
+        p.id === postId
+          ? { ...p, isLiked: !nextLiked, likes: Math.max(0, p.likes + (nextLiked ? -1 : 1)) }
+          : p;
+      set((state) => ({ feedPosts: state.feedPosts.map(revert), posts: state.posts.map(revert) }));
     }
   },
 
   toggleSave: async (postId: string) => {
+    const patch = (p: CommunityPost) => (p.id === postId ? { ...p, isSaved: !p.isSaved } : p);
+    set((state) => ({ feedPosts: state.feedPosts.map(patch), posts: state.posts.map(patch) }));
+
     try {
-      set((state) => ({
-        posts: state.posts.map((post) =>
-          post.id === postId ? { ...post, isSaved: !post.isSaved } : post
-        ),
-      }));
+      const next = await communityApi.toggleSavePost(postId);
+      const reconcile = (p: CommunityPost) => (p.id === postId ? { ...p, isSaved: next } : p);
+      set((state) => ({ feedPosts: state.feedPosts.map(reconcile), posts: state.posts.map(reconcile) }));
     } catch (error) {
       console.error('[Community] Toggle save error:', error);
+      const revert = (p: CommunityPost) => (p.id === postId ? { ...p, isSaved: !p.isSaved } : p);
+      set((state) => ({ feedPosts: state.feedPosts.map(revert), posts: state.posts.map(revert) }));
     }
   },
 
@@ -288,9 +319,16 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
         posts: state.posts.map((post) =>
           post.id === postId ? { ...post, comments: post.comments + 1 } : post
         ),
+        feedPosts: state.feedPosts.map((post) =>
+          post.id === postId ? { ...post, comments: post.comments + 1 } : post
+        ),
       }));
     } catch (error) {
       console.error('[Community] Add comment error:', error);
+      if (isSuspendedError(error)) {
+        throw new Error('Your account has been suspended and can no longer comment.');
+      }
+      throw error;
     }
   },
 
@@ -314,7 +352,6 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
       }));
     } catch (error) {
       console.error('[Community] Toggle like comment error:', error);
-      // Revert
       set((state) => ({
         comments: state.comments.map((c) =>
           c.id === commentId
@@ -325,40 +362,17 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
     }
   },
 
-  subscribeToComments: (postId: string) => {
-    get().unsubscribeFromComments();
-
-    commentsChannel = supabase
-      .channel(`post-comments:${postId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'post_comments',
-          filter: `post_id=eq.${postId}`,
-        },
-        () => {
-          refreshComments(postId);
-        }
-      )
-      .subscribe();
-  },
-
-  unsubscribeFromComments: () => {
-    if (commentsChannel) {
-      supabase.removeChannel(commentsChannel);
-      commentsChannel = null;
-    }
-  },
-
-  // Stories (prototype/mock)
+  // Stories (DB-backed, grouped by author)
   loadStories: async () => {
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId) return;
     set({ isLoadingStories: true });
     try {
-      const now = new Date();
-      const validStories = MOCK_STORIES.filter((story) => new Date(story.expiresAt) > now);
-      set({ stories: validStories, isLoadingStories: false });
+      const result = await communityApi.fetchStories(userId);
+      const stories = result.stories.map((row) =>
+        communityApi.mapStoryRowToStory(row, result.viewedStoryIds)
+      );
+      set({ stories, storyGroups: buildStoryGroups(stories), isLoadingStories: false });
     } catch (error) {
       console.error('[Community] Load stories error:', error);
       set({ isLoadingStories: false });
@@ -367,75 +381,79 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
 
   createStory: async (storyData) => {
     try {
-      const newStory: Story = {
-        ...storyData,
-        id: `story-${Date.now()}`,
+      const row = await communityApi.createStory(storyData);
+      const me = useAuthStore.getState().user;
+
+      const story: Story = {
+        id: row.id,
+        userId: row.user_id,
+        username: me?.username ?? 'You',
+        avatarUrl: me?.avatarUrl,
+        mediaUrl: row.media_url,
+        mediaType: row.media_type,
+        caption: row.caption ?? undefined,
+        createdAt: row.created_at,
+        expiresAt: row.expires_at,
         viewers: [],
         isViewed: false,
-        createdAt: new Date().toISOString(),
       };
 
-      set((state) => ({ stories: [newStory, ...state.stories] }));
+      const nextStories = [story, ...get().stories];
+      set({ stories: nextStories, storyGroups: buildStoryGroups(nextStories) });
     } catch (error) {
       console.error('[Community] Create story error:', error);
+      if (isSuspendedError(error)) {
+        throw new Error('Your account has been suspended and can no longer post stories.');
+      }
+      throw error;
     }
   },
 
   viewStory: async (storyId: string) => {
+    // Optimistic local update + persist.
+    set((state) => {
+      const nextStories = state.stories.map((story) =>
+        story.id === storyId
+          ? { ...story, isViewed: true, viewers: [...(story.viewers || []), 'me'] }
+          : story
+      );
+      return { stories: nextStories, storyGroups: buildStoryGroups(nextStories) };
+    });
     try {
-      set((state) => ({
-        stories: state.stories.map((story) =>
-          story.id === storyId
-            ? { ...story, isViewed: true, viewers: [...(story.viewers || []), 'me'] }
-            : story
-        ),
-      }));
+      await communityApi.viewStory(storyId);
     } catch (error) {
       console.error('[Community] View story error:', error);
     }
   },
 
-  // Follows (prototype/mock)
-  toggleFollow: async (userId: string) => {
-    try {
-      set((state) => {
-        const isFollowing = state.following.includes(userId);
-        return {
-          following: isFollowing
-            ? state.following.filter((id) => id !== userId)
-            : [...state.following, userId],
-        };
-      });
-    } catch (error) {
-      console.error('[Community] Toggle follow error:', error);
-    }
-  },
-
-  loadUserRelations: async () => {
-    try {
-      set({
-        following: ['user-1', 'user-2', 'user-4'],
-        followers: ['user-2', 'user-3', 'user-5'],
-      });
-    } catch (error) {
-      console.error('[Community] Load user relations error:', error);
-    }
-  },
-
   reset: () => {
-    get().unsubscribeFromComments();
     set({
       posts: [],
       isLoadingPosts: false,
+      feedPosts: [],
+      feedPage: 0,
+      feedHasMore: true,
+      isLoadingFeed: false,
+      isLoadingMoreFeed: false,
+      feedSeenIds: [],
       comments: [],
       isLoadingComments: false,
-      stories: MOCK_STORIES,
+      stories: [],
+      storyGroups: [],
       isLoadingStories: false,
-      following: ['user-1', 'user-2', 'user-4'],
-      followers: ['user-2', 'user-3', 'user-5'],
     });
   },
 }));
+
+/**
+ * Detect an RLS insert rejection — the server-side "banned user" block from
+ * migration 015. Surfaced to the user as a clear suspension message.
+ */
+function isSuspendedError(error: unknown): boolean {
+  const code = (error as any)?.code;
+  const message = (error as any)?.message ?? '';
+  return code === '42501' || /row-level security|permission denied|policy/i.test(message);
+}
 
 /**
  * If the picked image is a local file/blob URI, upload it to the dish-photos

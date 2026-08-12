@@ -98,7 +98,6 @@ export function DishPhotoCard({ post, onLike, width }: DishPhotoCardProps) {
                 name="heart"
                 size={16}
                 color={post.isLiked ? colors.live : colors.mutedForeground}
-                style={{ fill: post.isLiked ? colors.live : "none" }}
               />
             </Animated.View>
             <Text

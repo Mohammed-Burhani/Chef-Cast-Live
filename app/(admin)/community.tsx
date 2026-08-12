@@ -1,241 +1,576 @@
 /**
- * Community Management - Admin dashboard for managing community content
- * Features: Post moderation, comment management, user reports, community stats
+ * Community Management - Admin dashboard for moderating community content.
+ *
+ * Tabs:
+ *   - Overview    : DB-wide KPIs (posts, comments, likes, saves, reports…) + top posters
+ *   - Top Posts   : posts ranked by engagement (likes + comments), with hide/delete
+ *   - Top Comments: comments ranked by likes, with hide/delete
+ *   - Reports     : moderation queue of reported posts/comments
+ *
+ * Backed by the admin-community RPCs + admin-only RLS policies from migration 015.
  */
 
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Platform } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-import { useCommunityStore } from "@/store/communityStore";
-import { CommunityPost, Comment } from "@/types";
+import {
+  ContentReportRow,
+  TopCommentRow,
+  TopPosterRow,
+  TopPostRow,
+} from "@/lib/api/admin-community";
+import {
+  useCommunityAdminStats,
+  useContentReports,
+  useModerateComment,
+  useModeratePost,
+  useResolveReport,
+  useSetUserBanned,
+  useTopComments,
+  useTopPosters,
+  useTopPosts,
+} from "@/lib/api/admin-community-hooks";
 
-type TabType = "posts" | "comments" | "reports" | "stats";
+type TabType = "overview" | "posts" | "comments" | "reports";
 
 export default function CommunityManagement() {
   const colors = useColors();
-  const posts = useCommunityStore((s) => s.posts);
-  const comments = useCommunityStore((s) => s.comments);
 
-  const [activeTab, setActiveTab] = useState<TabType>("posts");
-  const [selectedFilter, setSelectedFilter] = useState<"all" | "reported" | "flagged">("all");
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
 
-  const TABS: Array<{ id: TabType; label: string; icon: keyof typeof Feather.glyphMap }> = [
-    { id: "posts", label: "Posts", icon: "grid" },
-    { id: "comments", label: "Comments", icon: "message-circle" },
-    { id: "reports", label: "Reports", icon: "flag" },
-    { id: "stats", label: "Stats", icon: "bar-chart-2" },
+  // Data
+  const stats = useCommunityAdminStats();
+  const topPosts = useTopPosts();
+  const topComments = useTopComments();
+  const topPosters = useTopPosters();
+  const reports = useContentReports();
+
+  // Mutations
+  const moderatePost = useModeratePost();
+  const moderateComment = useModerateComment();
+  const setUserBanned = useSetUserBanned();
+  const resolveReport = useResolveReport();
+
+  const TABS: Array<{ id: TabType; label: string; icon: keyof typeof Feather.glyphMap; badge?: number }> = [
+    { id: "overview", label: "Overview", icon: "bar-chart-2" },
+    { id: "posts", label: "Top Posts", icon: "grid" },
+    { id: "comments", label: "Top Comments", icon: "message-circle" },
+    { id: "reports", label: "Reports", icon: "flag", badge: stats.data?.pending_reports },
   ];
 
-  const FILTERS = [
-    { id: "all", label: "All" },
-    { id: "reported", label: "Reported" },
-    { id: "flagged", label: "Flagged" },
-  ];
-
-  const handleDeletePost = (postId: string) => {
-    // TODO: Implement delete post functionality
-    console.log("Delete post:", postId);
+  /** Run a mutation and surface any error, matching the admin-page idiom. */
+  const run = async (fn: () => Promise<unknown>, okMsg?: string) => {
+    try {
+      await fn();
+      if (okMsg) Alert.alert("Success", okMsg);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Something went wrong");
+    }
   };
 
-  const handleDeleteComment = (commentId: string) => {
-    // TODO: Implement delete comment functionality
-    console.log("Delete comment:", commentId);
+  // ── Post actions ──────────────────────────────────────────────────────────
+  const toggleHidePost = (post: TopPostRow) =>
+    run(() => moderatePost.mutateAsync({ postId: post.id, action: post.is_hidden ? "unhide" : "hide" }));
+
+  const confirmDeletePost = (post: TopPostRow) =>
+    Alert.alert(
+      "Delete Post",
+      `Delete ${post.username}'s post? Its comments and bookmarks are removed too. This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            run(() => moderatePost.mutateAsync({ postId: post.id, action: "delete" }), "Post deleted"),
+        },
+      ]
+    );
+
+  // ── Comment actions ───────────────────────────────────────────────────────
+  const toggleHideComment = (comment: TopCommentRow) =>
+    run(() =>
+      moderateComment.mutateAsync({
+        commentId: comment.id,
+        action: comment.is_hidden ? "unhide" : "hide",
+      })
+    );
+
+  const confirmDeleteComment = (comment: TopCommentRow) =>
+    Alert.alert("Delete Comment", `Delete ${comment.username}'s comment? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          run(
+            () => moderateComment.mutateAsync({ commentId: comment.id, action: "delete" }),
+            "Comment deleted"
+          ),
+      },
+    ]);
+
+  // ── User ban ──────────────────────────────────────────────────────────────
+  const confirmBanUser = (userId: string | null, username: string | null, banned: boolean) => {
+    if (!userId) return;
+    Alert.alert(
+      banned ? "Unban User" : "Ban User",
+      `${banned ? "Unban" : "Ban"} ${username ?? "this user"}? Their ${
+        banned ? "content will be visible again" : "posts and comments will be hidden from other users"
+      }.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: banned ? "Unban" : "Ban",
+          style: banned ? "default" : "destructive",
+          onPress: () =>
+            run(() => setUserBanned.mutateAsync({ userId, banned }), banned ? "User unbanned" : "User banned"),
+        },
+      ]
+    );
   };
 
-  const handleBanUser = (userId: string) => {
-    // TODO: Implement ban user functionality
-    console.log("Ban user:", userId);
+  // ── Report actions ────────────────────────────────────────────────────────
+  const handleHideReported = (report: ContentReportRow) =>
+    run(async () => {
+      if (report.target_type === "post") {
+        await moderatePost.mutateAsync({ postId: report.target_id, action: "hide" });
+      } else {
+        await moderateComment.mutateAsync({ commentId: report.target_id, action: "hide" });
+      }
+      await resolveReport.mutateAsync({ reportId: report.id, status: "resolved" });
+    }, "Content hidden");
+
+  const confirmDeleteReported = (report: ContentReportRow) =>
+    Alert.alert("Delete Content", `Delete this reported ${report.target_type}? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          run(async () => {
+            if (report.target_type === "post") {
+              await moderatePost.mutateAsync({ postId: report.target_id, action: "delete" });
+            } else {
+              await moderateComment.mutateAsync({ commentId: report.target_id, action: "delete" });
+            }
+            await resolveReport.mutateAsync({ reportId: report.id, status: "resolved" });
+          }, "Content deleted"),
+      },
+    ]);
+
+  const dismissReport = (report: ContentReportRow) =>
+    run(() => resolveReport.mutateAsync({ reportId: report.id, status: "dismissed" }), "Report dismissed");
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
   };
 
-  const renderPosts = () => (
-    <View style={styles.content}>
-      <View style={styles.filterBar}>
-        {FILTERS.map((filter) => (
-          <TouchableOpacity
-            key={filter.id}
-            onPress={() => setSelectedFilter(filter.id as any)}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: selectedFilter === filter.id ? colors.primary : colors.surface,
-                borderColor: selectedFilter === filter.id ? colors.primary : colors.border,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterLabel,
-                { color: selectedFilter === filter.id ? "#fff" : colors.mutedForeground },
-              ]}
-            >
-              {filter.label}
+  // ==========================================================================
+  // OVERVIEW
+  // ==========================================================================
+  const renderOverview = () => {
+    if (stats.isLoading) return <Loader text="Loading stats..." />;
+    if (stats.isError || !stats.data) return <ErrorState onRetry={() => stats.refetch()} />;
+    const s = stats.data;
+
+    const kpis: Array<{ label: string; value: number; icon: keyof typeof Feather.glyphMap; color: string }> = [
+      { label: "Total Posts", value: s.total_posts, icon: "grid", color: colors.primary },
+      { label: "Total Comments", value: s.total_comments, icon: "message-circle", color: colors.accent },
+      { label: "Total Likes", value: s.total_likes, icon: "heart", color: colors.live },
+      { label: "Total Saves", value: s.total_saves, icon: "bookmark", color: colors.success },
+      { label: "Stories", value: s.total_stories, icon: "zap", color: colors.warning },
+      { label: "Active Posters", value: s.total_posters, icon: "users", color: colors.success },
+      { label: "Pending Reports", value: s.pending_reports, icon: "flag", color: colors.danger },
+      { label: "Posts This Week", value: s.posts_this_week, icon: "trending-up", color: colors.primary },
+      { label: "Comments This Week", value: s.comments_this_week, icon: "message-square", color: colors.accent },
+      { label: "Hidden Posts", value: s.hidden_posts, icon: "eye-off", color: colors.mutedForeground },
+      { label: "Banned Users", value: s.banned_users, icon: "shield-off", color: colors.danger },
+    ];
+
+    return (
+      <>
+        <View style={styles.statsGrid}>
+          {kpis.map((kpi) => (
+            <View key={kpi.label} style={[styles.statCard, { backgroundColor: colors.surface }]}>
+              <Feather name={kpi.icon} size={22} color={kpi.color} />
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{(kpi.value ?? 0).toLocaleString()}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{kpi.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top Posters</Text>
+        {topPosters.isLoading ? (
+          <Loader text="Loading posters..." />
+        ) : !topPosters.data || topPosters.data.length === 0 ? (
+          <Empty text="No posters yet" subtext="Posts from your users will show up here" icon="users" />
+        ) : (
+          <View style={styles.list}>
+            {topPosters.data.map((poster, index) => (
+              <View key={poster.user_id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
+                <View style={[styles.rank, { backgroundColor: index < 3 ? colors.primary : colors.muted }]}>
+                  <Text style={[styles.rankText, { color: index < 3 ? "#fff" : colors.foreground }]}>
+                    {index + 1}
+                  </Text>
+                </View>
+                <Image
+                  source={{ uri: poster.avatar_url ?? undefined }}
+                  style={[styles.avatar, { backgroundColor: colors.muted }]}
+                  contentFit="cover"
+                />
+                <View style={styles.itemBody}>
+                  <View style={styles.titleRow}>
+                    <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
+                      {poster.username}
+                    </Text>
+                    {poster.is_banned && (
+                      <View style={[styles.badge, { backgroundColor: `${colors.danger}20` }]}>
+                        <Text style={[styles.badgeText, { color: colors.danger }]}>BANNED</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.itemMeta, { color: colors.mutedForeground }]}>
+                    {poster.post_count} posts · {poster.likes_received} likes ·{" "}
+                    {poster.comments_received} comments · {poster.saves_received} saves
+                  </Text>
+                </View>
+                <View style={styles.engagement}>
+                  <Text style={[styles.engagementValue, { color: colors.primary }]}>
+                    {(poster.engagement ?? 0).toLocaleString()}
+                  </Text>
+                  <Text style={[styles.engagementLabel, { color: colors.mutedForeground }]}>eng</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    confirmBanUser(poster.user_id, poster.username, !poster.is_banned)
+                  }
+                  style={[styles.iconBtn, { backgroundColor: `${colors.warning}15` }]}
+                  hitSlop={6}
+                >
+                  <Feather
+                    name={poster.is_banned ? "shield" : "shield-off"}
+                    size={16}
+                    color={colors.warning}
+                  />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </>
+    );
+  };
+
+  // ==========================================================================
+  // TOP POSTS
+  // ==========================================================================
+  const renderTopPosts = () => {
+    if (topPosts.isLoading) return <Loader text="Loading posts..." />;
+    if (topPosts.isError) return <ErrorState onRetry={() => topPosts.refetch()} />;
+    if (!topPosts.data || topPosts.data.length === 0)
+      return <Empty text="No posts yet" subtext="Posts ranked by engagement appear here" icon="grid" />;
+
+    return (
+      <View style={styles.list}>
+        {topPosts.data.map((post, index) => (
+          <View key={post.id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.itemHeader}>
+              <View style={styles.itemUserInfo}>
+                <Image
+                  source={{ uri: post.avatar_url ?? undefined }}
+                  style={[styles.avatar, { backgroundColor: colors.muted }]}
+                  contentFit="cover"
+                />
+                <View style={styles.itemUserDetails}>
+                  <Text style={[styles.itemUsername, { color: colors.foreground }]}>
+                    #{index + 1} · {post.username}
+                  </Text>
+                  <Text style={[styles.itemTime, { color: colors.mutedForeground }]}>
+                    {new Date(post.created_at).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+              {post.is_hidden && (
+                <View style={[styles.badge, { backgroundColor: `${colors.danger}20` }]}>
+                  <Text style={[styles.badgeText, { color: colors.danger }]}>HIDDEN</Text>
+                </View>
+              )}
+            </View>
+
+            <Image
+              source={{ uri: post.image_url }}
+              style={styles.itemImage}
+              contentFit="cover"
+            />
+
+            {post.caption ? (
+              <Text style={[styles.itemText, { color: colors.foreground }]} numberOfLines={2}>
+                {post.caption}
+              </Text>
+            ) : null}
+
+            <Text style={[styles.itemMeta, { color: colors.mutedForeground }]}>
+              {post.like_count} likes · {post.comment_count} comments · {post.save_count} saves ·{" "}
+              {(post.engagement ?? 0).toLocaleString()} engagement
             </Text>
-          </TouchableOpacity>
+
+            <View style={styles.itemActions}>
+              <TouchableOpacity
+                onPress={() => toggleHidePost(post)}
+                style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
+              >
+                <Feather name={post.is_hidden ? "eye" : "eye-off"} size={15} color={colors.warning} />
+                <Text style={[styles.actionButtonText, { color: colors.warning }]}>
+                  {post.is_hidden ? "Unhide" : "Hide"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => confirmBanUser(post.user_id, post.username, false)}
+                style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
+              >
+                <Feather name="shield-off" size={15} color={colors.warning} />
+                <Text style={[styles.actionButtonText, { color: colors.warning }]}>Ban</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => confirmDeletePost(post)}
+                style={[styles.actionButton, { backgroundColor: `${colors.danger}15` }]}
+              >
+                <Feather name="trash-2" size={15} color={colors.danger} />
+                <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ))}
       </View>
+    );
+  };
 
-      {posts.map((post) => (
-        <View key={post.id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
-          <View style={styles.itemHeader}>
-            <View style={styles.itemUserInfo}>
-              <Image
-                source={{ uri: post.avatarUrl }}
-                style={[styles.itemAvatar, { backgroundColor: colors.muted }]}
-                contentFit="cover"
-              />
-              <View style={styles.itemUserDetails}>
-                <Text style={[styles.itemUsername, { color: colors.foreground }]}>
-                  {post.username}
-                </Text>
-                <Text style={[styles.itemTime, { color: colors.mutedForeground }]}>
-                  {new Date(post.createdAt).toLocaleString()}
+  // ==========================================================================
+  // TOP COMMENTS
+  // ==========================================================================
+  const renderTopComments = () => {
+    if (topComments.isLoading) return <Loader text="Loading comments..." />;
+    if (topComments.isError) return <ErrorState onRetry={() => topComments.refetch()} />;
+    if (!topComments.data || topComments.data.length === 0)
+      return <Empty text="No comments yet" subtext="Comments ranked by likes appear here" icon="message-circle" />;
+
+    return (
+      <View style={styles.list}>
+        {topComments.data.map((comment, index) => (
+          <View key={comment.id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.itemHeader}>
+              <View style={styles.itemUserInfo}>
+                <Image
+                  source={{ uri: comment.avatar_url ?? undefined }}
+                  style={[styles.avatar, { backgroundColor: colors.muted }]}
+                  contentFit="cover"
+                />
+                <View style={styles.itemUserDetails}>
+                  <Text style={[styles.itemUsername, { color: colors.foreground }]}>
+                    #{index + 1} · {comment.username}
+                  </Text>
+                  <Text style={[styles.itemTime, { color: colors.mutedForeground }]}>
+                    {new Date(comment.created_at).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.itemStats}>
+                <Feather name="heart" size={13} color={colors.live} />
+                <Text style={[styles.statText, { color: colors.mutedForeground }]}>
+                  {comment.like_count}
                 </Text>
               </View>
             </View>
-            <View style={styles.itemStats}>
-              <Text style={[styles.statText, { color: colors.mutedForeground }]}>
-                {post.likes} likes · {post.comments} comments
+
+            <Text style={[styles.itemText, { color: colors.foreground }]}>{comment.text}</Text>
+
+            {comment.post_caption ? (
+              <Text style={[styles.itemMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                on: {comment.post_caption}
               </Text>
-            </View>
-          </View>
-          
-          <Image
-            source={{ uri: post.photoUrl }}
-            style={styles.itemImage}
-            contentFit="cover"
-          />
-          
-          {post.caption && (
-            <Text style={[styles.itemCaption, { color: colors.foreground }]} numberOfLines={2}>
-              {post.caption}
-            </Text>
-          )}
-          
-          <View style={styles.itemActions}>
-            <TouchableOpacity
-              onPress={() => handleDeletePost(post.id)}
-              style={[styles.actionButton, { backgroundColor: `${colors.danger}15` }]}
-            >
-              <Feather name="trash-2" size={16} color={colors.danger} />
-              <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleBanUser(post.userId)}
-              style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
-            >
-              <Feather name="shield" size={16} color={colors.warning} />
-              <Text style={[styles.actionButtonText, { color: colors.warning }]}>Ban User</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
+            ) : null}
 
-  const renderComments = () => (
-    <View style={styles.content}>
-      {comments.map((comment) => (
-        <View key={comment.id} style={[styles.itemCard, { backgroundColor: colors.surface }]}>
-          <View style={styles.itemHeader}>
-            <View style={styles.itemUserInfo}>
-              <View style={[styles.itemAvatar, { backgroundColor: colors.muted }]}>
-                <Text style={[styles.avatarInitial, { color: colors.foreground }]}>
-                  {comment.username.charAt(0).toUpperCase()}
-                </Text>
+            {comment.is_hidden && (
+              <View style={[styles.badge, { backgroundColor: `${colors.danger}20` }]}>
+                <Text style={[styles.badgeText, { color: colors.danger }]}>HIDDEN</Text>
               </View>
-              <View style={styles.itemUserDetails}>
-                <Text style={[styles.itemUsername, { color: colors.foreground }]}>
-                  {comment.username}
+            )}
+
+            <View style={styles.itemActions}>
+              <TouchableOpacity
+                onPress={() => toggleHideComment(comment)}
+                style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
+              >
+                <Feather name={comment.is_hidden ? "eye" : "eye-off"} size={15} color={colors.warning} />
+                <Text style={[styles.actionButtonText, { color: colors.warning }]}>
+                  {comment.is_hidden ? "Unhide" : "Hide"}
                 </Text>
-                <Text style={[styles.itemTime, { color: colors.mutedForeground }]}>
-                  {new Date(comment.createdAt).toLocaleString()}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.itemStats}>
-              <Text style={[styles.statText, { color: colors.mutedForeground }]}>
-                {comment.likes} likes
-              </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => confirmBanUser(comment.user_id, comment.username, false)}
+                style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
+              >
+                <Feather name="shield-off" size={15} color={colors.warning} />
+                <Text style={[styles.actionButtonText, { color: colors.warning }]}>Ban</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => confirmDeleteComment(comment)}
+                style={[styles.actionButton, { backgroundColor: `${colors.danger}15` }]}
+              >
+                <Feather name="trash-2" size={15} color={colors.danger} />
+                <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
+              </TouchableOpacity>
             </View>
           </View>
-          
-          <Text style={[styles.itemText, { color: colors.foreground }]}>
-            {comment.text}
-          </Text>
-          
-          <View style={styles.itemActions}>
-            <TouchableOpacity
-              onPress={() => handleDeleteComment(comment.id)}
-              style={[styles.actionButton, { backgroundColor: `${colors.danger}15` }]}
-            >
-              <Feather name="trash-2" size={16} color={colors.danger} />
-              <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleBanUser(comment.userId)}
-              style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
-            >
-              <Feather name="shield" size={16} color={colors.warning} />
-              <Text style={[styles.actionButtonText, { color: colors.warning }]}>Ban User</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-
-  const renderReports = () => (
-    <View style={[styles.content, styles.emptyContent]}>
-      <Feather name="flag" size={48} color={colors.mutedForeground} />
-      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-        No reports yet
-      </Text>
-      <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
-        Reported content will appear here
-      </Text>
-    </View>
-  );
-
-  const renderStats = () => (
-    <View style={styles.content}>
-      <View style={styles.statsGrid}>
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-          <Feather name="grid" size={24} color={colors.primary} />
-          <Text style={[styles.statValue, { color: colors.foreground }]}>{posts.length}</Text>
-          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Posts</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-          <Feather name="message-circle" size={24} color={colors.accent} />
-          <Text style={[styles.statValue, { color: colors.foreground }]}>{comments.length}</Text>
-          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Comments</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-          <Feather name="heart" size={24} color={colors.live} />
-          <Text style={[styles.statValue, { color: colors.foreground }]}>
-            {posts.reduce((sum, post) => sum + post.likes, 0)}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Likes</Text>
-        </View>
-        <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-          <Feather name="users" size={24} color={colors.success} />
-          <Text style={[styles.statValue, { color: colors.foreground }]}>
-            {new Set(posts.map(post => post.userId)).size}
-          </Text>
-          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Active Users</Text>
-        </View>
+        ))}
       </View>
-    </View>
-  );
+    );
+  };
+
+  // ==========================================================================
+  // REPORTS (moderation queue)
+  // ==========================================================================
+  const renderReports = () => {
+    if (reports.isLoading) return <Loader text="Loading reports..." />;
+    if (reports.isError) return <ErrorState onRetry={() => reports.refetch()} />;
+    if (!reports.data || reports.data.length === 0)
+      return <Empty text="No reports" subtext="Reported content will appear here" icon="flag" />;
+
+    return (
+      <View style={styles.list}>
+        {reports.data.map((report) => {
+          const pending = report.status === "pending";
+          const isPost = report.target_type === "post";
+          return (
+            <View
+              key={report.id}
+              style={[
+                styles.itemCard,
+                { backgroundColor: colors.surface, opacity: pending ? 1 : 0.6 },
+              ]}
+            >
+              <View style={styles.itemHeader}>
+                <View style={styles.itemUserInfo}>
+                  <Image
+                    source={{ uri: report.reporter_avatar_url ?? undefined }}
+                    style={[styles.avatar, { backgroundColor: colors.muted }]}
+                    contentFit="cover"
+                  />
+                  <View style={styles.itemUserDetails}>
+                    <Text style={[styles.itemUsername, { color: colors.foreground }]}>
+                      {report.target_author_username ?? "Deleted user"}
+                    </Text>
+                    <Text style={[styles.itemTime, { color: colors.mutedForeground }]}>
+                      Reported by {report.reporter_username} · {timeAgo(report.created_at)}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.badge,
+                    {
+                      backgroundColor: pending ? `${colors.danger}20` : `${colors.mutedForeground}20`,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.badgeText, { color: pending ? colors.danger : colors.mutedForeground }]}>
+                    {pending ? "PENDING" : report.status.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+
+              {isPost && report.target_image_url ? (
+                <Image
+                  source={{ uri: report.target_image_url }}
+                  style={styles.itemImage}
+                  contentFit="cover"
+                />
+              ) : null}
+
+              <View style={[styles.reportTarget, { backgroundColor: colors.background }]}>
+                <Text style={[styles.itemText, { color: colors.foreground }]} numberOfLines={3}>
+                  {report.target_content || "(deleted)"}
+                </Text>
+              </View>
+
+              <View style={styles.reasonRow}>
+                <Feather name="flag" size={13} color={colors.danger} />
+                <Text style={[styles.reasonText, { color: colors.foreground }]}>
+                  {report.reason}
+                </Text>
+                <Text style={[styles.reasonMeta, { color: colors.mutedForeground }]}>
+                  · {isPost ? "Post" : "Comment"}
+                </Text>
+              </View>
+              {report.details ? (
+                <Text style={[styles.itemMeta, { color: colors.mutedForeground }]}>
+                  "{report.details}"
+                </Text>
+              ) : null}
+
+              {pending ? (
+                <View style={styles.itemActions}>
+                  <TouchableOpacity
+                    onPress={() => handleHideReported(report)}
+                    style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
+                  >
+                    <Feather name="eye-off" size={15} color={colors.warning} />
+                    <Text style={[styles.actionButtonText, { color: colors.warning }]}>Hide</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteReported(report)}
+                    style={[styles.actionButton, { backgroundColor: `${colors.danger}15` }]}
+                  >
+                    <Feather name="trash-2" size={15} color={colors.danger} />
+                    <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => dismissReport(report)}
+                    style={[styles.actionButton, { backgroundColor: `${colors.primary}15` }]}
+                  >
+                    <Feather name="x-circle" size={15} color={colors.primary} />
+                    <Text style={[styles.actionButtonText, { color: colors.primary }]}>Dismiss</Text>
+                  </TouchableOpacity>
+                  {report.target_author_id && (
+                    <TouchableOpacity
+                      onPress={() => confirmBanUser(report.target_author_id, report.target_author_username, false)}
+                      style={[styles.actionButton, { backgroundColor: `${colors.warning}15` }]}
+                    >
+                      <Feather name="shield-off" size={15} color={colors.warning} />
+                      <Text style={[styles.actionButtonText, { color: colors.warning }]}>Ban</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
+                <Text style={[styles.itemMeta, { color: colors.mutedForeground }]}>
+                  {report.status === "resolved" ? "Resolved" : "Dismissed"} by a moderator
+                </Text>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
     <ScrollView
@@ -250,10 +585,7 @@ export default function CommunityManagement() {
           <TouchableOpacity
             key={tab.id}
             onPress={() => setActiveTab(tab.id)}
-            style={[
-              styles.tab,
-              activeTab === tab.id && { borderBottomColor: colors.primary },
-            ]}
+            style={[styles.tab, activeTab === tab.id && { borderBottomColor: colors.primary }]}
           >
             <Feather
               name={tab.icon}
@@ -268,16 +600,72 @@ export default function CommunityManagement() {
             >
               {tab.label}
             </Text>
+            {tab.badge ? (
+              <View style={[styles.tabBadge, { backgroundColor: colors.danger }]}>
+                <Text style={styles.tabBadgeText}>{tab.badge}</Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Content */}
-      {activeTab === "posts" && renderPosts()}
-      {activeTab === "comments" && renderComments()}
+      {activeTab === "overview" && renderOverview()}
+      {activeTab === "posts" && renderTopPosts()}
+      {activeTab === "comments" && renderTopComments()}
       {activeTab === "reports" && renderReports()}
-      {activeTab === "stats" && renderStats()}
     </ScrollView>
+  );
+}
+
+// ============================================================================
+// Shared state helpers
+// ============================================================================
+
+function Loader({ text }: { text: string }) {
+  const colors = useColors();
+  return (
+    <View style={styles.centerState}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={[styles.centerText, { color: colors.mutedForeground }]}>{text}</Text>
+    </View>
+  );
+}
+
+function Empty({
+  text,
+  subtext,
+  icon,
+}: {
+  text: string;
+  subtext: string;
+  icon: keyof typeof Feather.glyphMap;
+}) {
+  const colors = useColors();
+  return (
+    <View style={[styles.content, styles.emptyContent]}>
+      <Feather name={icon} size={48} color={colors.mutedForeground} />
+      <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>{text}</Text>
+      <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>{subtext}</Text>
+    </View>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const colors = useColors();
+  return (
+    <View style={styles.centerState}>
+      <Feather name="alert-circle" size={48} color={colors.danger} />
+      <Text style={[styles.centerText, { color: colors.mutedForeground }]}>
+        Couldn't load data.
+      </Text>
+      <TouchableOpacity
+        onPress={onRetry}
+        style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+      >
+        <Text style={styles.retryLabel}>Retry</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -312,107 +700,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  tabBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+  },
+  tabBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
   content: {
     gap: 16,
   },
-  filterBar: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  itemCard: {
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
-  itemHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  itemUserInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  itemAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitial: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  itemUserDetails: {
-    gap: 2,
-  },
-  itemUsername: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  itemTime: {
-    fontSize: 12,
-  },
-  itemStats: {
-    alignItems: "flex-end",
-  },
-  statText: {
-    fontSize: 12,
-  },
-  itemImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 8,
-  },
-  itemCaption: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  itemText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  itemActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  emptyContent: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 64,
-    gap: 12,
-  },
-  emptyText: {
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
-  },
-  emptySubtext: {
-    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 16,
+    marginTop: 24,
   },
   statsGrid: {
     flexDirection: "row",
@@ -428,10 +736,190 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statValue: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800",
   },
   statLabel: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+  list: {
+    gap: 16,
+  },
+  itemCard: {
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  itemHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  itemUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+  itemUserDetails: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  itemUsername: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  itemTime: {
+    fontSize: 12,
+  },
+  itemBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  itemMeta: {
+    fontSize: 12,
+  },
+  itemText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  itemStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  itemImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 8,
+  },
+  itemActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  actionButtonText: {
     fontSize: 13,
+    fontWeight: "600",
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rank: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rankText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  engagement: {
+    alignItems: "center",
+  },
+  engagementValue: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  engagementLabel: {
+    fontSize: 10,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  reportTarget: {
+    borderRadius: 8,
+    padding: 12,
+  },
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  reasonText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  reasonMeta: {
+    fontSize: 12,
+  },
+  centerState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 80,
+    gap: 12,
+  },
+  centerText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  emptyContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 64,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: "center",
+  },
+  retryBtn: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryLabel: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

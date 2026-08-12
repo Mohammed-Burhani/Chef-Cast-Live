@@ -86,6 +86,7 @@ function RootLayoutNav() {
       <Stack.Screen name="episode/[id]" />
       <Stack.Screen name="announcements" />
       <Stack.Screen name="email-unsubscribe" />
+      <Stack.Screen name="settings" />
     </Stack>
   );
 }

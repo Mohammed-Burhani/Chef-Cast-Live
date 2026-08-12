@@ -17,6 +17,7 @@ export interface UserProfile {
   subscriptionTier?: "free" | "premium";
   cookingLevel?: "beginner" | "home_cook" | "enthusiast";
   role: "admin" | "viewer";
+  isBanned?: boolean;
   createdAt: string;
 }
 
@@ -144,6 +145,32 @@ export interface Story {
   expiresAt: string;
   viewers?: string[];
   isViewed?: boolean;
+}
+
+/** A user's unexpired stories, grouped by author for the stories bar. */
+export interface StoryGroup {
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  stories: Story[];
+}
+
+/** A bookmarked post (shown in the Saved tab of Settings). */
+export interface SavedPost {
+  id: string;
+  post: CommunityPost;
+  savedAt: string;
+}
+
+/** One row in the user's Activity feed (posts/comments/likes/saves they made). */
+export interface ActivityItem {
+  id: string;
+  type: 'post' | 'comment' | 'like' | 'save';
+  postId: string;
+  imageUrl: string;
+  caption?: string;
+  text?: string;
+  createdAt: string;
 }
 
 export interface Follow {

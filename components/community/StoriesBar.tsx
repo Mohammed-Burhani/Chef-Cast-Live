@@ -1,6 +1,6 @@
 /**
  * StoriesBar - Instagram-like stories carousel
- * Shows user stories with view indicators
+ * Shows one ring per author (grouped unexpired stories), with view indicators.
  */
 
 import { Image } from "expo-image";
@@ -9,17 +9,16 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 import { useColors } from "@/hooks/useColors";
 import { useCommunityStore } from "@/store/communityStore";
-import { Story } from "@/types";
+import { StoryGroup } from "@/types";
 
 interface StoriesBarProps {
-  onStoryPress: (story: Story) => void;
+  onStoryPress: (group: StoryGroup) => void;
   onCreateStory?: () => void;
 }
 
 export function StoriesBar({ onStoryPress, onCreateStory }: StoriesBarProps) {
   const colors = useColors();
-  const stories = useCommunityStore((s) => s.stories);
-  const user = { id: "me", username: "you", avatarUrl: undefined }; // Current user
+  const storyGroups = useCommunityStore((s) => s.storyGroups);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -34,33 +33,45 @@ export function StoriesBar({ onStoryPress, onCreateStory }: StoriesBarProps) {
           <Text style={[styles.storyUsername, { color: colors.foreground }]}>Your Story</Text>
         </TouchableOpacity>
 
-        {/* Stories */}
-        {stories.map((story) => (
-          <TouchableOpacity
-            key={story.id}
-            style={styles.storyItem}
-            onPress={() => onStoryPress(story)}
-          >
-            <View
-              style={[
-                styles.storyAvatar,
-                {
-                  borderColor: story.isViewed ? colors.border : colors.primary,
-                  borderWidth: story.isViewed ? 1 : 2,
-                },
-              ]}
+        {/* Grouped stories: one ring per author */}
+        {storyGroups.map((group) => {
+          const latest = group.stories[0];
+          const allViewed = group.stories.every((s) => s.isViewed);
+          return (
+            <TouchableOpacity
+              key={group.userId}
+              style={styles.storyItem}
+              onPress={() => onStoryPress(group)}
             >
-              <Image
-                source={{ uri: story.avatarUrl }}
-                style={styles.storyAvatarImage}
-                contentFit="cover"
-              />
-            </View>
-            <Text style={[styles.storyUsername, { color: colors.foreground }]} numberOfLines={1}>
-              {story.username}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <View
+                style={[
+                  styles.storyAvatar,
+                  {
+                    borderColor: allViewed ? colors.border : colors.primary,
+                    borderWidth: allViewed ? 1 : 2,
+                  },
+                ]}
+              >
+                <View style={[styles.storyAvatarInner, { backgroundColor: colors.muted }]}>
+                  {latest?.avatarUrl ? (
+                    <Image
+                      source={{ uri: latest.avatarUrl }}
+                      style={styles.storyAvatarImage}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <Text style={[styles.avatarText, { color: colors.foreground }]}>
+                      {latest?.username?.[0]?.toUpperCase() ?? "?"}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <Text style={[styles.storyUsername, { color: colors.foreground }]} numberOfLines={1}>
+                {latest?.username ?? "user"}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -93,6 +104,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   avatarText: {
     fontSize: 24,

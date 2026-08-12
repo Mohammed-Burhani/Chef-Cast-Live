@@ -21,7 +21,12 @@ export interface Database {
           level_title: string
           total_correct: number
           episodes_participated: number
+          cooking_level: string | null
+          cuisines: string[] | null
+          gender: string | null
+          onboarded_at: string | null
           is_admin: boolean
+          is_banned: boolean
           email_notifications_enabled: boolean
           created_at: string
         }
@@ -33,7 +38,12 @@ export interface Database {
           level_title?: string
           total_correct?: number
           episodes_participated?: number
+          cooking_level?: string | null
+          cuisines?: string[] | null
+          gender?: string | null
+          onboarded_at?: string | null
           is_admin?: boolean
+          is_banned?: boolean
           email_notifications_enabled?: boolean
           created_at?: string
         }
@@ -45,7 +55,12 @@ export interface Database {
           level_title?: string
           total_correct?: number
           episodes_participated?: number
+          cooking_level?: string | null
+          cuisines?: string[] | null
+          gender?: string | null
+          onboarded_at?: string | null
           is_admin?: boolean
+          is_banned?: boolean
           email_notifications_enabled?: boolean
           created_at?: string
         }
@@ -394,7 +409,10 @@ export interface Database {
           episode_id: string | null
           image_url: string
           caption: string | null
+          location: string | null
+          tags: string[]
           like_count: number
+          is_hidden: boolean
           created_at: string
         }
         Insert: {
@@ -403,7 +421,10 @@ export interface Database {
           episode_id?: string | null
           image_url: string
           caption?: string | null
+          location?: string | null
+          tags?: string[]
           like_count?: number
+          is_hidden?: boolean
           created_at?: string
         }
         Update: {
@@ -412,7 +433,10 @@ export interface Database {
           episode_id?: string | null
           image_url?: string
           caption?: string | null
+          location?: string | null
+          tags?: string[]
           like_count?: number
+          is_hidden?: boolean
           created_at?: string
         }
         Relationships: [
@@ -464,12 +488,65 @@ export interface Database {
           }
         ]
       }
+      content_reports: {
+        Row: {
+          id: string
+          reporter_id: string
+          target_type: 'post' | 'comment'
+          target_id: string
+          reason: string
+          details: string | null
+          status: 'pending' | 'resolved' | 'dismissed'
+          resolved_by: string | null
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reporter_id: string
+          target_type: 'post' | 'comment'
+          target_id: string
+          reason: string
+          details?: string | null
+          status?: 'pending' | 'resolved' | 'dismissed'
+          resolved_by?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          reporter_id?: string
+          target_type?: 'post' | 'comment'
+          target_id?: string
+          reason?: string
+          details?: string | null
+          status?: 'pending' | 'resolved' | 'dismissed'
+          resolved_by?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_resolved_by_fkey"
+            columns: ["resolved_by"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       post_comments: {
         Row: {
           id: string
           post_id: string
           user_id: string
           text: string
+          is_hidden: boolean
           created_at: string
         }
         Insert: {
@@ -477,6 +554,7 @@ export interface Database {
           post_id: string
           user_id: string
           text: string
+          is_hidden?: boolean
           created_at?: string
         }
         Update: {
@@ -484,6 +562,7 @@ export interface Database {
           post_id?: string
           user_id?: string
           text?: string
+          is_hidden?: boolean
           created_at?: string
         }
         Relationships: [
@@ -529,6 +608,111 @@ export interface Database {
           },
           {
             foreignKeyName: "post_comment_likes_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      post_saves: {
+        Row: {
+          id: string
+          user_id: string
+          photo_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          photo_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          photo_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_saves_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_saves_photo_id_fkey"
+            columns: ["photo_id"]
+            referencedRelation: "dish_photos"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      stories: {
+        Row: {
+          id: string
+          user_id: string
+          media_url: string
+          media_type: 'image' | 'video'
+          caption: string | null
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          media_url: string
+          media_type?: 'image' | 'video'
+          caption?: string | null
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          media_url?: string
+          media_type?: 'image' | 'video'
+          caption?: string | null
+          expires_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      story_views: {
+        Row: {
+          id: string
+          story_id: string
+          user_id: string
+          viewed_at: string
+        }
+        Insert: {
+          id?: string
+          story_id: string
+          user_id: string
+          viewed_at?: string
+        }
+        Update: {
+          id?: string
+          story_id?: string
+          user_id?: string
+          viewed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_views_story_id_fkey"
+            columns: ["story_id"]
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_views_user_id_fkey"
             columns: ["user_id"]
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -828,6 +1012,43 @@ export interface Database {
           jobname: string
           schedule: string
           command: string
+        }[]
+      }
+      get_community_feed: {
+        Args: {
+          p_user_id: string
+          p_limit?: number
+          p_offset?: number
+          p_days_back?: number
+          p_exclude_ids?: string[]
+        }
+        Returns: {
+          id: string
+          user_id: string
+          username: string
+          avatar_url: string | null
+          image_url: string
+          caption: string | null
+          location: string | null
+          tags: string[]
+          like_count: number
+          comment_count: number
+          is_liked: boolean
+          is_saved: boolean
+          created_at: string
+          score: number
+        }[]
+      }
+      get_user_activity: {
+        Args: { p_user_id: string; p_limit?: number }
+        Returns: {
+          id: string
+          activity_type: 'post' | 'comment' | 'like' | 'save'
+          post_id: string
+          image_url: string
+          caption: string | null
+          text: string | null
+          created_at: string
         }[]
       }
     }

@@ -32,6 +32,7 @@ interface StoryViewerProps {
   initialIndex?: number;
   onClose: () => void;
   onUserPress?: (userId: string) => void;
+  onStoryViewed?: (storyId: string) => void;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -42,6 +43,7 @@ export function StoryViewer({
   initialIndex = 0,
   onClose,
   onUserPress,
+  onStoryViewed,
 }: StoryViewerProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -51,6 +53,13 @@ export function StoryViewer({
   const progressAnim = useSharedValue(0);
 
   const currentStory = stories[currentIndex];
+
+  // Record a view when a story becomes the active one.
+  useEffect(() => {
+    if (visible && currentStory) {
+      onStoryViewed?.(currentStory.id);
+    }
+  }, [visible, currentIndex, currentStory?.id, onStoryViewed]);
 
   useEffect(() => {
     if (!visible) {

@@ -26,6 +26,7 @@ interface PostCardProps {
   onSave: (postId: string) => void;
   onUserPress: (userId: string) => void;
   onHashtagPress: (tag: string) => void;
+  onReport: (postId: string) => void;
 }
 
 export function PostCard({
@@ -36,6 +37,7 @@ export function PostCard({
   onSave,
   onUserPress,
   onHashtagPress,
+  onReport,
 }: PostCardProps) {
   const colors = useColors();
   const [isLiked, setIsLiked] = useState(post.isLiked);
@@ -117,7 +119,7 @@ export function PostCard({
             )}
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.moreButton}>
+        <TouchableOpacity style={styles.moreButton} onPress={() => onReport(post.id)}>
           <Feather name="more-horizontal" size={20} color={colors.foreground} />
         </TouchableOpacity>
       </View>

@@ -1,12 +1,14 @@
 /**
  * UserProfile - Instagram-like user profile page
- * Shows user info, stats, posts grid, and follow/unfollow functionality
+ * Shows a real user's profile (from `profiles`) and their posts grid.
+ * Follow / message are NOT built yet (Community Mode scope: no follows for now).
  */
 
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
+  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,9 +19,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useCommunityStore } from "@/store/communityStore";
-import { useAuthStore } from "@/store/authStore";
-import { CommunityPost } from "@/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useProfile } from "@/lib/api/profiles";
+import { useUserPosts } from "@/lib/api/community-hooks";
 
 interface UserProfileProps {
   userId: string;
@@ -31,51 +33,14 @@ export function UserProfile({ userId, onBack }: UserProfileProps) {
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((s) => s.user);
 
-  const posts = useCommunityStore((s) => s.posts);
-  const following = useCommunityStore((s) => s.following);
-  const followers = useCommunityStore((s) => s.followers);
-  const toggleFollow = useCommunityStore((s) => s.toggleFollow);
-  const loadUserRelations = useCommunityStore((s) => s.loadUserRelations);
+  const { data: profile, isLoading: loadingProfile } = useProfile(userId);
+  const { data: userPosts = [], isLoading: loadingPosts } = useUserPosts(userId);
 
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [userPosts, setUserPosts] = useState<CommunityPost[]>([]);
+  const username = profile?.username ?? "user";
+  const loading = loadingProfile || loadingPosts;
 
-  // Mock user data - in real app, this would come from API
-  const userData = {
-    id: userId,
-    username: userId === "me" ? (currentUser?.username ?? "you") : "chef_marco",
-    displayName: userId === "me" ? "Your Name" : "Chef Marco",
-    avatarUrl: "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=200&h=200&fit=crop",
-    bio: "🍳 Professional chef | Sharing culinary adventures | DM for collaborations",
-    website: "chefmarco.com",
-    postsCount: 142,
-    followersCount: 24500,
-    followingCount: 892,
-  };
-
-  useEffect(() => {
-    // Load user relations
-    loadUserRelations(userId);
-    
-    // Check if current user is following this user
-    setIsFollowing(following.includes(userId));
-    
-    // Filter posts by this user
-    const userPostsFiltered = posts.filter(post => post.userId === userId);
-    setUserPosts(userPostsFiltered);
-  }, [userId, following, posts, loadUserRelations]);
-
-  const handleFollowToggle = async () => {
-    await toggleFollow(userId);
-    setIsFollowing(!isFollowing);
-  };
-
-  const handleMessage = () => {
-    // TODO: Open messaging interface
-    console.log("Message user:", userId);
-  };
-
-  const isOwnProfile = userId === "me" || userId === currentUser?.id;
+  const formatLevel = (level: string | null | undefined) =>
+    level ? level.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : undefined;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -89,121 +54,80 @@ export function UserProfile({ userId, onBack }: UserProfileProps) {
           <TouchableOpacity onPress={onBack} style={styles.headerButton}>
             <Feather name="arrow-left" size={24} color={colors.foreground} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-            {userData.username}
-          </Text>
-          <TouchableOpacity style={styles.headerButton}>
-            <Feather name="more-horizontal" size={24} color={colors.foreground} />
-          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>{username}</Text>
+          <View style={styles.headerButton} />
         </View>
 
-        {/* Profile Info */}
-        <View style={styles.profileSection}>
-          <View style={styles.profileHeader}>
-            <Image
-              source={{ uri: userData.avatarUrl }}
-              style={[styles.avatar, { backgroundColor: colors.muted }]}
-              contentFit="cover"
-            />
-            <View style={styles.stats}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.foreground }]}>
-                  {userData.postsCount}
-                </Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>posts</Text>
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          <>
+            {/* Profile Info */}
+            <View style={styles.profileSection}>
+              <View style={styles.profileHeader}>
+                <View style={[styles.avatar, { backgroundColor: colors.muted }]}>
+                  {profile?.avatar_url ? (
+                    <Image
+                      source={{ uri: profile.avatar_url }}
+                      style={styles.avatarImage}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <Text style={[styles.avatarText, { color: colors.foreground }]}>
+                      {username[0]?.toUpperCase() ?? "?"}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.stats}>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statValue, { color: colors.foreground }]}>
+                      {userPosts.length}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>posts</Text>
+                  </View>
+                </View>
               </View>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.foreground }]}>
-                  {userData.followersCount.toLocaleString()}
-                </Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>followers</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.foreground }]}>
-                  {userData.followingCount}
-                </Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>following</Text>
-              </TouchableOpacity>
+
+              <View style={styles.userInfo}>
+                <Text style={[styles.displayName, { color: colors.foreground }]}>{username}</Text>
+                {formatLevel(profile?.cooking_level) ? (
+                  <Text style={[styles.bio, { color: colors.foreground }]}>
+                    Level: {formatLevel(profile?.cooking_level)}
+                  </Text>
+                ) : null}
+                {profile?.cuisines?.length ? (
+                  <Text style={[styles.bio, { color: colors.mutedForeground }]}>
+                    Loves: {profile.cuisines.join(", ")}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
 
-          <View style={styles.userInfo}>
-            <Text style={[styles.displayName, { color: colors.foreground }]}>
-              {userData.displayName}
-            </Text>
-            <Text style={[styles.bio, { color: colors.foreground }]}>{userData.bio}</Text>
-            {userData.website && (
-              <TouchableOpacity>
-                <Text style={[styles.website, { color: colors.primary }]}>
-                  {userData.website}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Action Buttons */}
-          {!isOwnProfile && (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                onPress={handleFollowToggle}
-                style={[
-                  styles.followButton,
-                  {
-                    backgroundColor: isFollowing ? colors.surface : colors.primary,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.followButtonText,
-                    { color: isFollowing ? colors.foreground : "#fff" },
-                  ]}
-                >
-                  {isFollowing ? "Following" : "Follow"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleMessage}
-                style={[styles.messageButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <Text style={[styles.messageButtonText, { color: colors.foreground }]}>Message</Text>
-              </TouchableOpacity>
+            {/* Posts Grid */}
+            <View style={styles.postsGrid}>
+              {userPosts.length > 0 ? (
+                userPosts.map((post) => (
+                  <TouchableOpacity key={post.id} style={styles.postItem} activeOpacity={0.8}>
+                    <Image
+                      source={{ uri: post.photoUrl }}
+                      style={styles.postImage}
+                      contentFit="cover"
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Feather name="grid" size={48} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    No posts yet
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
-
-        {/* Tabs */}
-        <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={styles.tab}>
-            <Feather name="grid" size={24} color={colors.foreground} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tab}>
-            <Feather name="user" size={24} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Posts Grid */}
-        <View style={styles.postsGrid}>
-          {userPosts.length > 0 ? (
-            userPosts.map((post) => (
-              <TouchableOpacity key={post.id} style={styles.postItem}>
-                <Image
-                  source={{ uri: post.photoUrl }}
-                  style={styles.postImage}
-                  contentFit="cover"
-                />
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Feather name="grid" size={48} color={colors.mutedForeground} />
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                No posts yet
-              </Text>
-            </View>
-          )}
-        </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -227,10 +151,15 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     padding: 8,
+    width: 40,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: "700",
+  },
+  loadingState: {
+    paddingVertical: 80,
+    alignItems: "center",
   },
   profileSection: {
     padding: 16,
@@ -238,81 +167,55 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 20,
+    alignItems: "center",
+    gap: 24,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: "700",
   },
   stats: {
-    flex: 1,
     flexDirection: "row",
+    flex: 1,
     justifyContent: "space-around",
   },
   statItem: {
     alignItems: "center",
+    gap: 2,
   },
   statValue: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 13,
   },
   userInfo: {
     gap: 4,
   },
   displayName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "700",
   },
   bio: {
     fontSize: 14,
-    lineHeight: 20,
-  },
-  website: {
-    fontSize: 13,
-  },
-  actionButtons: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  followButton: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  followButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  messageButton: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  messageButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  tabs: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
   },
   postsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    paddingHorizontal: 2,
   },
   postItem: {
     width: "33.33%",
@@ -324,13 +227,14 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   emptyState: {
-    width: "100%",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 64,
     gap: 12,
+    width: "100%",
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

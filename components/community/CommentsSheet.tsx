@@ -23,6 +23,7 @@ import { useColors } from "@/hooks/useColors";
 import { useCommunityStore } from "@/store/communityStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Comment } from "@/types";
+import { ReportModal } from "@/components/community/ReportModal";
 
 interface CommentsSheetProps {
   visible: boolean;
@@ -40,19 +41,16 @@ export function CommentsSheet({ visible, postId, onClose }: CommentsSheetProps) 
   const loadComments = useCommunityStore((s) => s.loadComments);
   const addComment = useCommunityStore((s) => s.addComment);
   const toggleLikeComment = useCommunityStore((s) => s.toggleLikeComment);
-  const subscribeToComments = useCommunityStore((s) => s.subscribeToComments);
-  const unsubscribeFromComments = useCommunityStore((s) => s.unsubscribeFromComments);
 
   const [newComment, setNewComment] = useState("");
+  const [reportCommentId, setReportCommentId] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (!visible || !postId) return;
 
+    // Comments load on open and after posting — no realtime subscription.
     loadComments(postId);
-    subscribeToComments(postId);
-
-    return () => unsubscribeFromComments();
-  }, [visible, postId, loadComments, subscribeToComments, unsubscribeFromComments]);
+  }, [visible, postId, loadComments]);
 
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
@@ -156,6 +154,13 @@ export function CommentsSheet({ visible, postId, onClose }: CommentsSheetProps) 
                     <TouchableOpacity style={styles.commentAction}>
                       <Text style={[styles.replyText, { color: colors.primary }]}>Reply</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setReportCommentId(comment.id)}
+                      style={styles.commentAction}
+                      hitSlop={6}
+                    >
+                      <Feather name="flag" size={13} color={colors.mutedForeground} />
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
@@ -201,6 +206,16 @@ export function CommentsSheet({ visible, postId, onClose }: CommentsSheetProps) 
             <Feather name="send" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
+
+        {/* Report Modal */}
+        {reportCommentId && (
+          <ReportModal
+            visible={!!reportCommentId}
+            targetType="comment"
+            targetId={reportCommentId}
+            onClose={() => setReportCommentId(null)}
+          />
+        )}
       </View>
     </Modal>
   );

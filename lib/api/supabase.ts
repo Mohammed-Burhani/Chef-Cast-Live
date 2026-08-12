@@ -212,6 +212,8 @@ export async function uploadDishPhoto(params: {
   imageUrl: string;
   caption?: string;
   episodeId?: string;
+  tags?: string[];
+  location?: string;
 }) {
   const { data: session } = await supabase.auth.getSession();
   if (!session.session) throw new Error('Not authenticated');
@@ -223,6 +225,8 @@ export async function uploadDishPhoto(params: {
       image_url: params.imageUrl,
       caption: params.caption,
       episode_id: params.episodeId,
+      tags: params.tags ?? [],
+      location: params.location,
     })
     .select("*")
     .single();

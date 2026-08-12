@@ -124,6 +124,7 @@ function mapProfile(profile: any, email: string | undefined): UserProfile {
     currentStreak: 0,
     longestStreak: 0,
     role: profile.is_admin ? 'admin' : 'viewer',
+    isBanned: profile.is_banned ?? false,
     createdAt: profile.created_at,
   };
 }
