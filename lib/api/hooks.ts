@@ -47,6 +47,18 @@ export function useEpisode(id: string) {
   });
 }
 
+export function useDeleteEpisode() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: api.deleteEpisode,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.episodes });
+      queryClient.invalidateQueries({ queryKey: keys.liveEpisode });
+    },
+  });
+}
+
 export function useLiveEpisode() {
   return useQuery({
     queryKey: keys.liveEpisode,
@@ -284,12 +296,24 @@ export function useAnnouncements() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const channel = supabase
-      .channel('announcements-feed')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
-        queryClient.invalidateQueries({ queryKey: announcementKeys.all });
-      })
-      .subscribe();
+    // Check if channel already exists
+    const existingChannel = supabase.getChannels().find(ch => ch.topic === 'realtime:announcements-feed');
+    
+    if (existingChannel) {
+      // Channel already subscribed, skip
+      return;
+    }
+
+    // Build channel with listener BEFORE calling subscribe()
+    const channel = supabase.channel('announcements-feed');
+    
+    // Add postgres_changes listener first
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.all });
+    });
+    
+    // Then subscribe
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);

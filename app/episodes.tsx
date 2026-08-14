@@ -7,9 +7,9 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
-  Platform,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -21,7 +21,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useColors } from "@/hooks/useColors";
-import { useEpisodes } from "@/lib/api/hooks";
+import { useEpisodes, useDeleteEpisode } from "@/lib/api/hooks";
+import { useAuthStore } from "@/store/useAuthStore";
 import type { Database } from '@/types/database';
 
 type Episode = Database['public']['Tables']['episodes']['Row'];
@@ -65,7 +66,7 @@ function CountdownTimer({ scheduledAt }: { scheduledAt: string }) {
   );
 }
 
-function EpisodeCard({ episode }: { episode: Episode }) {
+function EpisodeCard({ episode, isAdmin, onDelete }: { episode: Episode; isAdmin: boolean; onDelete: (id: string) => void }) {
   const colors = useColors();
   const isPast = !!episode.ended_at; // Only ended if admin explicitly ended it
   const isLive = episode.is_live;
@@ -106,14 +107,29 @@ function EpisodeCard({ episode }: { episode: Episode }) {
       </View>
 
       <View style={styles.episodeInfo}>
-        <Text style={[styles.episodeTitle, { color: colors.foreground }]} numberOfLines={2}>
-          {episode.title}
-        </Text>
-        {episode.description && (
-          <Text style={[styles.episodeDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
-            {episode.description}
-          </Text>
-        )}
+        <View style={styles.episodeHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.episodeTitle, { color: colors.foreground }]} numberOfLines={2}>
+              {episode.title}
+            </Text>
+            {episode.description && (
+              <Text style={[styles.episodeDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
+                {episode.description}
+              </Text>
+            )}
+          </View>
+          {isAdmin && (
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                onDelete(episode.id);
+              }}
+              style={styles.deleteBtn}
+            >
+              <Feather name="trash-2" size={18} color={colors.destructive} />
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={styles.episodeMeta}>
           {episode.is_live ? (
@@ -133,11 +149,34 @@ function EpisodeCard({ episode }: { episode: Episode }) {
 
 export default function EpisodesScreen() {
   const colors = useColors();
+  const user = useAuthStore((s) => s.user);
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>(
     tab === 'past' ? 'past' : 'upcoming'
   );
   const { data: episodes = [], isLoading, refetch } = useEpisodes();
+  const deleteEpisodeMutation = useDeleteEpisode();
+
+  const handleDelete = (episodeId: string) => {
+    Alert.alert(
+      'Delete Episode',
+      'This will permanently delete the episode and all related data (questions, answers, scores, comments). Dish photos will be unlinked. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEpisodeMutation.mutateAsync(episodeId);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete episode');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Upcoming = not live, not ended (regardless of scheduled_at)
   const upcomingEpisodes = episodes.filter(
@@ -214,7 +253,9 @@ export default function EpisodesScreen() {
             </Text>
           </View>
         ) : (
-          displayEpisodes.map((ep) => <EpisodeCard key={ep.id} episode={ep} />)
+          displayEpisodes.map((ep) => (
+            <EpisodeCard key={ep.id} episode={ep} isAdmin={!!user?.is_admin} onDelete={handleDelete} />
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
@@ -264,6 +305,8 @@ const styles = StyleSheet.create({
   liveDot: { width: 6, height: 6, borderRadius: 3 },
   liveText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
   episodeInfo: { padding: 14, gap: 6 },
+  episodeHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  deleteBtn: { padding: 4 },
   episodeTitle: { fontSize: 17, fontWeight: '700', lineHeight: 22 },
   episodeDesc: { fontSize: 13, lineHeight: 18 },
   episodeMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },

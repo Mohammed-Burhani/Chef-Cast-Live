@@ -230,7 +230,7 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 80 }]}
+        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 120 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={false} onRefresh={() => refetch()} tintColor={colors.primary} />

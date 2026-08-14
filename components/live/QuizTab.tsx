@@ -290,7 +290,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
         >
           <Text style={[styles.betweenHeader, { color: colors.mutedForeground }]}>
@@ -327,7 +327,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.completeHeader}>
@@ -384,7 +384,7 @@ export function QuizTab({ episodeId }: QuizTabProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Revealing banner */}

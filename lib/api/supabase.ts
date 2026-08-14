@@ -52,6 +52,14 @@ export async function fetchEpisodeById(id: string) {
   return data as Episode;
 }
 
+export async function deleteEpisode(episodeId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-episode', {
+    body: { episodeId },
+  });
+
+  if (error) throw error;
+}
+
 // ============================================================================
 // QUESTIONS
 // ============================================================================

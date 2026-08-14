@@ -5,7 +5,7 @@
  */
 
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,6 +21,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useColors } from "@/hooks/useColors";
 import { useCommunityStore } from "@/store/communityStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { StoriesBar } from "@/components/community/StoriesBar";
 import { PostCard } from "@/components/community/PostCard";
 import { CreatePostModal } from "@/components/community/CreatePostModal";
@@ -30,6 +31,7 @@ import { StoryViewer } from "@/components/community/StoryViewer";
 import { CreateStoryModal } from "@/components/community/CreateStoryModal";
 import { ReportModal } from "@/components/community/ReportModal";
 import { Story, StoryGroup } from "@/types";
+import * as communityApi from "@/lib/api/community";
 
 export default function CommunityScreen() {
   const colors = useColors();
@@ -59,16 +61,42 @@ export default function CommunityScreen() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [reportPostId, setReportPostId] = useState<string | null>(null);
 
+  // Tab state: 'feed' = community feed, 'myPosts' = user's own posts for management
+  const [activeTab, setActiveTab] = useState<'feed' | 'myPosts'>('feed');
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [loadingMyPosts, setLoadingMyPosts] = useState(false);
+
+  const loadMyPosts = useCallback(async () => {
+    const uid = useAuthStore.getState().user?.id;
+    if (!uid) return;
+    setLoadingMyPosts(true);
+    try {
+      const posts = await communityApi.fetchUserPosts(uid);
+      setMyPosts(posts);
+    } catch (error) {
+      console.error('[Community] Load my posts error:', error);
+    } finally {
+      setLoadingMyPosts(false);
+    }
+  }, []);
+
   // Initial load: curated feed + stories.
+  // Re-run when user loads (feed requires authenticated user).
+  const userId = useAuthStore((s) => s.user?.id);
   useEffect(() => {
+    if (!userId) return;
     loadFeed();
     loadStories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadMyPosts();
+  }, [userId, loadFeed, loadStories, loadMyPosts]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadFeed(true), loadStories()]);
+    if (activeTab === 'feed') {
+      await Promise.all([loadFeed(true), loadStories()]);
+    } else {
+      await loadMyPosts();
+    }
     setRefreshing(false);
   };
 
@@ -126,8 +154,42 @@ export default function CommunityScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Stories Bar */}
-      <StoriesBar onStoryPress={handleStoryPress} onCreateStory={handleCreateStory} />
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'feed' && styles.tabButtonActive,
+          ]}
+          onPress={() => setActiveTab('feed')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'feed' && styles.tabTextActive,
+          ]}>
+            Feed
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'myPosts' && styles.tabButtonActive,
+          ]}
+          onPress={() => setActiveTab('myPosts')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'myPosts' && styles.tabTextActive,
+          ]}>
+            My Posts
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stories Bar (only on Feed tab) */}
+      {activeTab === 'feed' && (
+        <StoriesBar onStoryPress={handleStoryPress} onCreateStory={handleCreateStory} />
+      )}
     </>
   );
 
@@ -137,7 +199,7 @@ export default function CommunityScreen() {
         style={styles.list}
         contentContainerStyle={{ paddingBottom: bottomPadding + 80 }}
         showsVerticalScrollIndicator={false}
-        data={feedPosts}
+        data={activeTab === 'feed' ? feedPosts : myPosts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostCard
@@ -153,37 +215,65 @@ export default function CommunityScreen() {
         )}
         ListHeaderComponent={header}
         ListFooterComponent={
-          isLoadingMoreFeed ? (
-            <View style={styles.footerLoader}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : !feedHasMore && feedPosts.length > 0 ? (
-            <Text style={[styles.endText, { color: colors.mutedForeground }]}>
-              You're all caught up 🎉
-            </Text>
+          activeTab === 'feed' ? (
+            <>
+              {isLoadingMoreFeed ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : !feedHasMore && feedPosts.length > 0 ? (
+                <Text style={[styles.endText, { color: colors.mutedForeground }]}>
+                  You're all caught up 🎉
+                </Text>
+              ) : null}
+            </>
           ) : null
         }
         ListEmptyComponent={
-          isLoadingFeed ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
+          activeTab === 'feed' ? (
+            isLoadingFeed ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Feather name="users" size={48} color={colors.mutedForeground} />
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  No posts yet
+                </Text>
+                <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
+                  Be the first to share your culinary creation!
+                </Text>
+              </View>
+            )
           ) : (
-            <View style={styles.emptyState}>
-              <Feather name="users" size={48} color={colors.mutedForeground} />
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                No posts yet
-              </Text>
-              <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
-                Be the first to share your culinary creation!
-              </Text>
-            </View>
+            loadingMyPosts ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : myPosts.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Feather name="image" size={48} color={colors.mutedForeground} />
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                  No posts yet
+                </Text>
+                <Text style={[styles.emptySubtext, { color: colors.mutedForeground }]}>
+                  Tap the + button to share your first culinary creation!
+                </Text>
+              </View>
+            ) : null
           )
         }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
-        onEndReached={() => loadMoreFeed()}
+        onEndReached={
+          activeTab === 'feed'
+            ? feedPosts.length > 0
+              ? () => loadMoreFeed()
+              : undefined
+            : undefined
+        }
         onEndReachedThreshold={0.5}
       />
 
@@ -281,6 +371,31 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tabBar: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignItems: "center",
+    backgroundColor: "rgba(128,128,128,0.1)",
+  },
+  tabButtonActive: {
+    backgroundColor: "#000",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  tabTextActive: {
+    color: "#fff",
   },
   footerLoader: {
     paddingVertical: 24,

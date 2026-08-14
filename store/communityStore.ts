@@ -204,7 +204,8 @@ export const useCommunityStore = create<CommunityState>()((set, get) => ({
       }));
     } catch (error) {
       console.error('[Community] Load feed error:', error);
-      set({ isLoadingFeed: false, isLoadingMoreFeed: false });
+      // On error, mark feed as exhausted to prevent infinite retry loops from onEndReached
+      set({ isLoadingFeed: false, isLoadingMoreFeed: false, feedHasMore: false });
     }
   },
 

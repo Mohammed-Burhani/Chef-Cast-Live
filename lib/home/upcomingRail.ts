@@ -23,7 +23,10 @@ export function buildUpcomingRail<T extends RailEpisode>(
 ): T[] {
   if (!soonLive) return [];
 
+  // Only show episodes that are NOT live yet
   const reminders = soonLive.filter((ep) => !ep.is_live);
+  
+  // Show live episodes ONLY if we watched them transition during this session
   const liveTransitioned = soonLive.filter(
     (ep) => ep.is_live && transitionedLiveIds.has(ep.id)
   );
