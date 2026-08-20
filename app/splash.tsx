@@ -1,5 +1,6 @@
 /**
- * Splash screen — animated three-logo entrance
+ * Splash screen — animated two-logo entrance
+ * Sponsor logo is now the full centered hero, production logo anchors the bottom
  * Pure UI, auto-navigates after 2.8s
  */
 
@@ -16,6 +17,9 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useAuthStore } from "@/store/useAuthStore";
+import colors from "@/constants/colors";
+
+const theme = colors.light;
 
 // Prevent native splash from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -24,7 +28,6 @@ export default function SplashScreenComponent() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
 
   // Animation values
-  const topOpacity = useSharedValue(0);
   const heroOpacity = useSharedValue(0);
   const heroTranslateY = useSharedValue(12);
   const bottomOpacity = useSharedValue(0);
@@ -34,12 +37,10 @@ export default function SplashScreenComponent() {
     SplashScreen.hideAsync();
 
     // Trigger animations
-    topOpacity.value = withDelay(200, withTiming(0.7, { duration: 300 }));
-    
-    heroOpacity.value = withDelay(500, withTiming(1, { duration: 500 }));
-    heroTranslateY.value = withDelay(500, withTiming(0, { duration: 500 }));
-    
-    bottomOpacity.value = withDelay(900, withTiming(1, { duration: 300 }));
+    heroOpacity.value = withDelay(200, withTiming(1, { duration: 500 }));
+    heroTranslateY.value = withDelay(200, withTiming(0, { duration: 500 }));
+
+    bottomOpacity.value = withDelay(700, withTiming(1, { duration: 300 }));
 
     // Auto-navigate after 2.8s
     const timer = setTimeout(() => {
@@ -52,10 +53,6 @@ export default function SplashScreenComponent() {
 
     return () => clearTimeout(timer);
   }, [isLoggedIn]);
-
-  const topStyle = useAnimatedStyle(() => ({
-    opacity: topOpacity.value,
-  }));
 
   const heroStyle = useAnimatedStyle(() => ({
     opacity: heroOpacity.value,
@@ -70,30 +67,18 @@ export default function SplashScreenComponent() {
     <View style={styles.container}>
       <StatusBar hidden />
 
-      {/* Top zone — Sponsor/Partner */}
-      <View style={styles.topZone}>
-        <Animated.View style={[styles.topContent, topStyle]}>
-          <Text style={styles.labelTop}>PRESENTED BY</Text>
+      {/* Hero zone — full sponsor logo, big and centered */}
+      <View style={styles.heroZone}>
+        <Animated.View style={[styles.heroContent, heroStyle]}>
           <Image
-            source={require("@/assets/logos/sponsor-haier.png")}
-            style={styles.topLogo}
-            contentFit="cover"
-          />
-        </Animated.View>
-      </View>
-
-      {/* Middle zone — Hero Foodilicious */}
-      <View style={styles.middleZone}>
-        <Animated.View style={heroStyle}>
-          <Image
-            source={require("@/assets/logos/G_Foodilicious_Clean.png")}
+            source={require("@/assets/logos/sponsor-with.png")}
             style={styles.heroLogo}
-            contentFit="cover"
+            contentFit="contain"
           />
         </Animated.View>
       </View>
 
-      {/* Bottom zone — Production */}
+      {/* Bottom zone — Production, same size as before */}
       <View style={styles.bottomZone}>
         <Animated.View style={[styles.bottomContent, bottomStyle]}>
           <View style={styles.divider} />
@@ -112,37 +97,21 @@ export default function SplashScreenComponent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0905",
+    backgroundColor: theme.cardForeground,
   },
-  topZone: {
-    flex: 0.15,
+  heroZone: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 40,
+    paddingHorizontal: 32,
   },
-  topContent: {
-    alignItems: "center",
-    gap: 8,
-  },
-  labelTop: {
-    fontSize: 9,
-    fontWeight: "600",
-    letterSpacing: 1.5,
-    color: "#8B7355",
-    textTransform: "uppercase",
-  },
-  topLogo: {
-    width: 100,
-    height: 40,
-  },
-  middleZone: {
-    flex: 0.5,
-    justifyContent: "center",
+  heroContent: {
+    width: "100%",
     alignItems: "center",
   },
   heroLogo: {
-    width: 280,
-    height: 120,
+    width: "100%",
+    height: 220,
   },
   bottomZone: {
     flex: 0.35,
@@ -157,8 +126,8 @@ const styles = StyleSheet.create({
   divider: {
     width: 60,
     height: 1,
-    backgroundColor: "#D4AF37",
-    opacity: 0.3,
+    backgroundColor: theme.accent,
+    opacity: 0.4,
     marginBottom: 4,
   },
   labelBottom: {

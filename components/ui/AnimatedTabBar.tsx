@@ -161,7 +161,7 @@ export default function AnimatedTabBar({
         },
       ]}
     >
-      {isIOS && <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />}
+      {isIOS && <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />}
 
       <View pointerEvents="none" style={[styles.hairline, { backgroundColor: colors.border }]} />
 

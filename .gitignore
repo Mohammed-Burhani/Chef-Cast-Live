@@ -64,5 +64,8 @@ Thumbs.db
 expo-env.d.ts
 # @end expo-cli
 .vercel
+.claude
+.kiro
+.agents
 
 /service-account-pkey.json

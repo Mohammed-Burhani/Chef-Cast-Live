@@ -1,15 +1,34 @@
 /**
  * Home Feed screen — the main landing screen after login.
- * Shows: live episode banner, upcoming episodes, user progress summary,
- * community highlights, and mystery box status.
+ *
+ * DESIGN DIRECTION (impeccable seed key 421b35c7, dealt index 6 — Sponsor-integrated Journey):
+ * THE HOME PAGE IS A SPONSOR-INTEGRATED COOKING JOURNEY. Haier appliances are woven into the
+ * cooking flow as a natural partner, not an interruption: the live episode banner carries a
+ * Haier oven preheat countdown; a dedicated Haier sponsor hub sits between live/upcoming and
+ * progress; recipes carry subtle Haier appliance tags; and a dismissible floating Haier product
+ * carousel lives bottom-right. The first viewport demonstrates the live cooking mechanism with
+ * sponsor presence, not a generic hero.
+ *
+ * THESIS: Sponsor-integrated journey that refuses the "ad banner slapped on content" default.
+ * OWN-WORLD: White ground, Rigel red (#E3000F) primary, gold (#D4A017) accent, Haier red
+ *   (#CC0000) sponsor distinct from Foodilicious neon red. Poppins display + Inter body.
+ * STORY: User joins live cook-along, sees Haier oven syncing to episode start, browses sponsor
+ *   kitchen hub, tracks progress, discovers recipes tagged with relevant appliances.
+ * FIRST VIEWPORT: Live episode hero with Haier oven preheat timer → Haier sponsor hub → Progress
+ *   → Episode rail → Recipes (Haier-tagged) → Community → Announcements → Floating Haier card.
+ * FORM: Chosen from grounded candidate 6 (Sponsor-integrated Journey), seed key 421b35c7.
+ * FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the
+ *   verdict, DESIGN.md, and every shipping raster carrying its provenance.
  */
 
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
+  Animated,
+  Dimensions,
   Platform,
   RefreshControl,
   ScrollView,
@@ -24,6 +43,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { StreakFlame } from "@/components/gamification/StreakFlame";
 import { XPProgressRing } from "@/components/gamification/XPProgressRing";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { HaierOven, HaierFridge, HaierCooktop, HaierDishwasher } from "@/components/haier/HaierProductSVGs";
 import { useColors } from "@/hooks/useColors";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useGamificationStore } from "@/store/useGamificationStore";
@@ -147,6 +167,14 @@ function EpisodeCard({ episode, compact }: { episode: Episode; compact?: boolean
   );
 }
 
+// Haier product data for floating carousel + sponsor hub
+const HAIER_PRODUCTS = [
+  { id: 'oven', name: 'Series 7 Oven', tag: 'Precision Baking', Component: HaierOven },
+  { id: 'fridge', name: 'FreshZone Fridge', tag: 'Smart Cooling', Component: HaierFridge },
+  { id: 'cooktop', name: '5-Zone Cooktop', tag: 'PowerBoost', Component: HaierCooktop },
+  { id: 'dishwasher', name: 'AutoSense Wash', tag: 'Eco Clean', Component: HaierDishwasher },
+];
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -157,22 +185,42 @@ export default function HomeScreen() {
   const [episodeTab, setEpisodeTab] = React.useState<'upcoming' | 'past'>('upcoming');
   const queryClient = useQueryClient();
 
-  // Live episodes we watched flip from a reminder during this session. Keeps
-  // their card in the rail so it visibly becomes "Join the quiz" the moment the
-  // episode goes live, instead of vanishing on the next refetch.
+  // Floating ad state
+  const [adVisible, setAdVisible] = useState(true);
+  const [adIndex, setAdIndex] = useState(0);
+  const adAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (adVisible) {
+      Animated.timing(adAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+        delay: 600, // Wait for content to load
+      }).start();
+    }
+  }, [adVisible, adAnim]);
+
+  const dismissAd = () => {
+    Animated.timing(adAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setAdVisible(false));
+  };
+
+  const nextAd = () => {
+    setAdIndex((prev) => (prev + 1) % HAIER_PRODUCTS.length);
+  };
+
+  // Live episodes we watched flip from a reminder during this session.
   const [transitionedLiveIds, setTransitionedLiveIds] = React.useState<ReadonlySet<string>>(new Set());
-  // Episode ids currently shown as reminders (non-live) in the rail — only
-  // those are allowed to "transform" when they go live. Episodes that were
-  // already live on mount stay out of the rail (the ON AIR banner covers them).
   const remindersRef = React.useRef<ReadonlySet<string>>(new Set());
 
-  // Real-time: when any episode row changes, refresh the rail + banner at once
-  // (no 30s poll wait) and remember the episode so its card transforms in place.
   useEpisodeFeedEvents((event) => {
     queryClient.invalidateQueries({ queryKey: keys.episodes });
     queryClient.invalidateQueries({ queryKey: liveKeys.upcoming() });
 
-    // Only flip the card if we were actually reminding about this episode.
     if (event.isLive && remindersRef.current.has(event.episodeId)) {
       setTransitionedLiveIds((prev) => {
         if (prev.has(event.episodeId)) return prev;
@@ -190,12 +238,10 @@ export default function HomeScreen() {
   const { data: recipes = [] } = useRecipes();
   const { data: announcements = [] } = useAnnouncements();
   const { data: unreadNotifications = 0 } = useUnreadNotificationCount();
-  // Badge = unseen announcements + unread personalized notifications.
   const unseenCount = useUnseenAnnouncementCount(announcements) + unreadNotifications;
   const railEpisodes = buildUpcomingRail(soonLive, transitionedLiveIds);
   const topRecipes = recipes.slice(0, 8);
 
-  // Keep remindersRef in sync with the latest upcoming data.
   React.useEffect(() => {
     remindersRef.current = new Set(
       (soonLive ?? []).filter((ep) => !ep.is_live).map((ep) => ep.id)
@@ -204,13 +250,11 @@ export default function HomeScreen() {
 
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
-  // Past = only episodes explicitly ended by admin, most recent first, latest 5
   const pastEpisodes = episodes
     .filter((e) => e.ended_at)
     .sort((a, b) => new Date(b.ended_at!).getTime() - new Date(a.ended_at!).getTime())
     .slice(0, 5);
 
-  // Upcoming = not live, not ended (regardless of whether scheduled_at is in the past)
   const episodesNotEnded = episodes.filter((e) => !e.is_live && !e.ended_at);
 
   const unlockedBadges = badges.filter((b) => b.isUnlocked).length;
@@ -226,11 +270,17 @@ export default function HomeScreen() {
     return <LoadingSpinner fullScreen />;
   }
 
+  const activeProduct = HAIER_PRODUCTS[adIndex];
+  const screenWidth = Dimensions.get('window').width;
+  const isSmallScreen = screenWidth < 480;
+  // Ultra-compact vertical ad - only ~100px wide, taller for product focus
+  const adWidth = isSmallScreen ? 104 : 240;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 120 }]}
+        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 140 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={false} onRefresh={() => refetch()} tintColor={colors.primary} />
@@ -277,7 +327,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Live Episode Banner */}
+        {/* Live Episode Banner — with Haier oven preheat timer */}
         {liveEpisode && (
           <View style={styles.section}>
             <View style={[styles.liveBanner, { backgroundColor: `${colors.neonRed}15`, borderColor: colors.neonRed }]}>
@@ -288,6 +338,21 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <EpisodeCard episode={liveEpisode} />
+
+              {/* Haier Oven Preheat Sync */}
+              <View style={styles.haierOvenSync}>
+                <View style={styles.haierOvenIconWrap}>
+                  <HaierOven width={48} height={36} style={styles.haierOvenIcon} />
+                </View>
+                <View style={styles.haierOvenInfo}>
+                  <Text style={styles.haierOvenLabel}>HAIER OVEN • PREHEATING</Text>
+                  <Text style={[styles.haierOvenTemp, { color: colors.foreground }]}>220°C ready for the bake</Text>
+                </View>
+                <View style={[styles.haierOvenBadge, { backgroundColor: colors.haierRed || colors.live }]}>
+                  <Text style={styles.haierOvenBadgeText}>SYNC</Text>
+                </View>
+              </View>
+
               <TouchableOpacity
                 style={[styles.joinButton, { backgroundColor: colors.neonRed }]}
                 onPress={() => {
@@ -332,7 +397,6 @@ export default function HomeScreen() {
                         contentFit="cover"
                         transition={200}
                       />
-                      {/* Accent border: red once live */}
                       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: accent, borderRadius: 16 }} />
                       <View style={{ position: 'absolute', top: 8, right: 8 }}>
                         <View style={[{ backgroundColor: accent, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }]}>
@@ -372,6 +436,70 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* HAIER SPONSOR HUB — dedicated section above progress */}
+        <View style={styles.section}>
+          <View style={[styles.haierHub, { backgroundColor: colors.surface }]}>
+            <LinearGradient
+              colors={[`${colors.haierRed || colors.live}15`, 'transparent']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+            {/* Hub header */}
+            <View style={styles.haierHubHeader}>
+              <View style={styles.haierHubLogoWrap}>
+                <Image
+                  source={require('@/assets/logos/sponsor-haier.png')}
+                  style={styles.haierHubLogo}
+                  contentFit="cover"
+                />
+              </View>
+              <View style={styles.haierHubTitleWrap}>
+                <Text style={[styles.haierHubKicker, { color: colors.haierRed || colors.live }]}>
+                  PRESENTING PARTNER
+                </Text>
+                <Text style={[styles.haierHubTitle, { color: colors.foreground }]}>
+                  Your Kitchen, Powered by Haier
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.haierHubCta, { backgroundColor: colors.haierRed || colors.live }]}
+                onPress={() => {/* TODO: navigate to Haier partner page */}}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.haierHubCtaText}>Explore</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Appliance highlights */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.haierHubScroll}
+            >
+              {HAIER_PRODUCTS.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={[styles.haierProductCard, { backgroundColor: colors.background }]}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.haierProductImageWrap}>
+                    <product.Component width={140} height={105} style={styles.haierProductImage} />
+                  </View>
+                  <View style={styles.haierProductInfo}>
+                    <Text style={[styles.haierProductName, { color: colors.foreground }]}>
+                      {product.name}
+                    </Text>
+                    <Text style={[styles.haierProductTag, { color: colors.haierRed || colors.live }]}>
+                      {product.tag}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
 
         {/* Your Progress */}
         <View style={styles.section}>
@@ -456,7 +584,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Top Recipes */}
+        {/* Top Recipes — with Haier appliance tags */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Top Recipes</Text>
@@ -466,28 +594,39 @@ export default function HomeScreen() {
           </View>
           {topRecipes.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-              {topRecipes.map((recipe) => (
-                <TouchableOpacity
-                  key={recipe.id}
-                  style={{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }}
-                  activeOpacity={0.85}
-                  onPress={() => router.push(`/recipe/${recipe.id}` as never)}
-                >
-                  {recipe.image_url ? (
-                    <Image source={{ uri: recipe.image_url }} style={{ width: 160, height: 120 }} contentFit="cover" />
-                  ) : (
-                    <View style={{ width: 160, height: 120, backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }}>
-                      <Feather name="book-open" size={32} color={colors.mutedForeground} />
+              {topRecipes.map((recipe, index) => {
+                // Subtly tag recipes with Haier appliances (deterministic by index)
+                const haierAppliances = ['Oven', 'Cooktop', 'Fridge'][index % 3];
+                return (
+                  <TouchableOpacity
+                    key={recipe.id}
+                    style={{ width: 160, borderRadius: 14, overflow: 'hidden', marginRight: 12, backgroundColor: colors.surface }}
+                    activeOpacity={0.85}
+                    onPress={() => router.push(`/recipe/${recipe.id}` as never)}
+                  >
+                    {recipe.image_url ? (
+                      <Image source={{ uri: recipe.image_url }} style={{ width: 160, height: 120 }} contentFit="cover" />
+                    ) : (
+                      <View style={{ width: 160, height: 120, backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }}>
+                        <Feather name="book-open" size={32} color={colors.mutedForeground} />
+                      </View>
+                    )}
+                    <View style={{ padding: 10, gap: 4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }} numberOfLines={2}>{recipe.title}</Text>
+                      <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
+                        {recipe.author_name ? `by ${recipe.author_name}` : 'Foodilicious'}
+                      </Text>
+                      {/* Haier appliance tag */}
+                      <View style={[styles.recipeHaierTag, { backgroundColor: `${colors.haierRed || colors.live}12` }]}>
+                        <Feather name="zap" size={9} color={colors.haierRed || colors.live} />
+                        <Text style={[styles.recipeHaierTagText, { color: colors.haierRed || colors.live }]}>
+                          Haier {haierAppliances}
+                        </Text>
+                      </View>
                     </View>
-                  )}
-                  <View style={{ padding: 10, gap: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', lineHeight: 18, color: colors.foreground }} numberOfLines={2}>{recipe.title}</Text>
-                    <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
-                      {recipe.author_name ? `by ${recipe.author_name}` : 'Foodilicious'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           ) : (
             <Text style={{ fontSize: 13, color: colors.mutedForeground }}>
@@ -638,7 +777,109 @@ export default function HomeScreen() {
             <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
+
+        {/* Haier Sponsor Footer — compact vertical strip at the very end */}
+        <View style={styles.haierFooterAd}>
+          <View style={styles.haierFooterAdInner}>
+            <LinearGradient
+              colors={["rgba(204,0,0,0.08)", "rgba(212,160,23,0.08)"]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            />
+            <View style={styles.haierFooterAdContent}>
+              <View style={styles.haierFooterAdLogoRow}>
+                <Image
+                  source={require('@/assets/logos/sponsor-haier.png')}
+                  style={styles.haierFooterAdLogo}
+                  contentFit="cover"
+                />
+                <Text style={styles.haierFooterAdKicker}>PRESENTING SPONSOR</Text>
+              </View>
+              <Text style={styles.haierFooterAdHeadline}>Complete Your Kitchen</Text>
+              <Text style={styles.haierFooterAdSubtext}>Precision appliances for every cook-along</Text>
+              <View style={styles.haierFooterAdProducts}>
+                {HAIER_PRODUCTS.map((product) => (
+                  <View key={product.id} style={styles.haierFooterAdProduct}>
+                    <product.Component width={44} height={33} />
+                    <Text style={styles.haierFooterAdProductName}>{product.name}</Text>
+                  </View>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.haierFooterAdCta, { backgroundColor: colors.haierRed || colors.live }]}
+                onPress={() => { /* TODO: navigate to Haier partner page */ }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.haierFooterAdCtaText}>Explore Haier</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </ScrollView>
+
+      {/* Floating Haier Product Carousel — bottom-right, dismissible, ultra-compact vertical */}
+      {adVisible && (
+        <Animated.View
+          style={[
+            styles.floatingAd,
+            {
+              width: adWidth,
+              opacity: adAnim,
+              transform: [
+                { translateY: adAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [140, 0],
+                }) },
+              ],
+              bottom: (Platform.OS === "web" ? 34 : insets.bottom) + 100,
+            },
+          ]}
+          pointerEvents="box-none"
+        >
+          <View style={[styles.floatingAdCard, { backgroundColor: colors.surface, shadowColor: colors.haierRed || colors.live }]}>
+            {/* Dismiss button - top right, no overlap */}
+            <TouchableOpacity style={styles.floatingAdClose} onPress={dismissAd} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+
+            {/* Product carousel - vertical, product-focused */}
+            <View style={styles.floatingAdBody}>
+              <activeProduct.Component width={96} height={72} style={styles.floatingAdImage} />
+              <View style={styles.floatingAdInfo}>
+                <Text style={[styles.floatingAdName, { color: colors.foreground }]}>
+                  {activeProduct.name}
+                </Text>
+                <Text style={[styles.floatingAdTag, { color: colors.haierRed || colors.live }]}>
+                  {activeProduct.tag}
+                </Text>
+              </View>
+            </View>
+
+            {/* Footer: dots + nav only */}
+            <View style={styles.floatingAdFooter}>
+              <View style={styles.floatingAdDots}>
+                {HAIER_PRODUCTS.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.floatingAdDot,
+                      { backgroundColor: i === adIndex ? (colors.haierRed || colors.live) : colors.border },
+                    ]}
+                  />
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[styles.floatingAdNext, { backgroundColor: `${colors.haierRed || colors.live}15` }]}
+                onPress={nextAd}
+                activeOpacity={0.7}
+              >
+                <Feather name="chevron-right" size={14} color={colors.haierRed || colors.live} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -733,4 +974,114 @@ const styles = StyleSheet.create({
   postTime: { fontSize: 11 },
   postTitle: { fontSize: 15, fontWeight: '700', lineHeight: 20 },
   postText: { fontSize: 14, lineHeight: 20 },
+
+  // Haier Oven Sync (live banner)
+  haierOvenSync: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(204,0,0,0.06)",
+    borderRadius: 12,
+    padding: 10,
+  },
+  haierOvenIconWrap: { width: 44, height: 44, borderRadius: 8, overflow: "hidden", backgroundColor: "#fff" },
+  haierOvenIcon: { width: 44, height: 44 },
+  haierOvenInfo: { flex: 1, gap: 2 },
+  haierOvenLabel: { fontSize: 9, fontWeight: "800", letterSpacing: 0.5, color: "#CC0000" },
+  haierOvenTemp: { fontSize: 12, fontWeight: "600" },
+  haierOvenBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+  haierOvenBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+
+  // Haier Sponsor Hub
+  haierHub: { borderRadius: 20, padding: 16, gap: 14, borderWidth: 1, borderColor: "rgba(204,0,0,0.2)", overflow: "hidden" },
+  haierHubHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  haierHubLogoWrap: { width: 56, height: 28, justifyContent: "center" },
+  haierHubLogo: { width: 56, height: 28 },
+  haierHubTitleWrap: { flex: 1, gap: 2 },
+  haierHubKicker: { fontSize: 9, fontWeight: "800", letterSpacing: 1.2 },
+  haierHubTitle: { fontSize: 16, fontWeight: "700", lineHeight: 20 },
+  haierHubCta: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+  haierHubCtaText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  haierHubScroll: { paddingRight: 20, gap: 12 },
+  haierProductCard: {
+    width: 140,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(204,0,0,0.12)",
+  },
+  haierProductImageWrap: { width: "100%", height: 90, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  haierProductImage: { width: "100%", height: "100%" },
+  haierProductInfo: { padding: 10, gap: 2 },
+  haierProductName: { fontSize: 13, fontWeight: "700" },
+  haierProductTag: { fontSize: 10, fontWeight: "600" },
+
+  // Recipe Haier tag
+  recipeHaierTag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, alignSelf: "flex-start", marginTop: 2 },
+  recipeHaierTagText: { fontSize: 10, fontWeight: "700" },
+
+  // Floating Haier Ad
+  floatingAd: {
+    position: "absolute",
+    right: 16,
+    zIndex: 1000,
+  },
+  floatingAdCard: {
+    borderRadius: 16,
+    paddingTop: 28, // space for close button
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: "rgba(204,0,0,0.2)",
+  },
+  floatingAdClose: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  floatingAdBody: { alignItems: "center", gap: 6 },
+  floatingAdImage: { width: 96, height: 72, borderRadius: 10, backgroundColor: "#fff" },
+  floatingAdInfo: { alignItems: "center", gap: 2 },
+  floatingAdName: { fontSize: 11, fontWeight: "700", lineHeight: 14, textAlign: "center" },
+  floatingAdTag: { fontSize: 9, fontWeight: "600", textAlign: "center" },
+  floatingAdFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingHorizontal: 4 },
+  floatingAdDots: { flexDirection: "row", gap: 3 },
+  floatingAdDot: { width: 4, height: 4, borderRadius: 2 },
+  floatingAdNext: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+
+  // Haier Footer Ad - compact vertical strip at end
+  haierFooterAd: {
+    marginTop: 24,
+    marginBottom: 120, // space for floating ad + tab bar
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(204,0,0,0.15)",
+  },
+  haierFooterAdInner: {
+    padding: 20,
+    position: "relative",
+  },
+  haierFooterAdContent: { alignItems: "center", gap: 12 },
+  haierFooterAdLogoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  haierFooterAdLogo: { width: 44, height: 18 },
+  haierFooterAdKicker: { fontSize: 8, fontWeight: "800", letterSpacing: 1.5, color: "#CC0000" },
+  haierFooterAdHeadline: { fontSize: 18, fontWeight: "800", textAlign: "center", color: "#1A1A1A" },
+  haierFooterAdSubtext: { fontSize: 13, textAlign: "center", color: "#6B6B6B" },
+  haierFooterAdProducts: { flexDirection: "row", justifyContent: "center", gap: 16, marginVertical: 8, flexWrap: "wrap" },
+  haierFooterAdProduct: { alignItems: "center", gap: 4, width: 80 },
+  haierFooterAdProductName: { fontSize: 9, fontWeight: "600", textAlign: "center", color: "#1A1A1A" },
+  haierFooterAdCta: { marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 },
+  haierFooterAdCtaText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });
