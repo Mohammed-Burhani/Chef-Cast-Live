@@ -70,7 +70,7 @@ export function PostCard({
       if (isHashtag && part) {
         return (
           <Text
-            key={index}
+            key={`hashtag-${index}`}
             style={[styles.hashtag, { color: colors.primary }]}
             onPress={() => onHashtagPress(part)}
           >
@@ -79,7 +79,7 @@ export function PostCard({
         );
       }
       return (
-        <Text key={index} style={[styles.captionText, { color: colors.foreground }]}>
+        <Text key={`text-${index}`} style={[styles.captionText, { color: colors.foreground }]}>
           {part}
         </Text>
       );
@@ -168,7 +168,7 @@ export function PostCard({
       {/* Likes */}
       <View style={styles.likesSection}>
         <Text style={[styles.likes, { color: colors.foreground }]}>
-          {likeCount.toLocaleString()} likes
+          {(likeCount || 0).toLocaleString()} likes
         </Text>
       </View>
 

@@ -93,7 +93,7 @@ export interface ContentReportRow {
 export async function fetchCommunityAdminStats(): Promise<AdminCommunityStats> {
   const { data, error } = await (supabase.rpc as any)('get_community_admin_stats');
   if (error) throw error;
-  return data as AdminCommunityStats;
+  return (Array.isArray(data) ? data[0] : data) as AdminCommunityStats;
 }
 
 export async function fetchTopPosts(limit = 15): Promise<TopPostRow[]> {
