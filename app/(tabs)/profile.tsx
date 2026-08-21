@@ -232,14 +232,14 @@ export default function ProfileScreen() {
           <View style={styles.sponsorLogos}>
             <View style={[styles.sponsorLogo, { backgroundColor: colors.surface }]}>
               <Image
-                source={require('@/assets/logos/G_Red.png')}
+                source={require('@/assets/logos/G_Red.webp')}
                 style={styles.sponsorImage}
                 contentFit="contain"
               />
             </View>
             <View style={[styles.sponsorLogo, { backgroundColor: colors.surface }]}>
               <Image
-                source={require('@/assets/logos/G_Foodilicious_Clean.png')}
+                source={require('@/assets/logos/G_Foodilicious_Clean.webp')}
                 style={styles.sponsorImage}
                 contentFit="contain"
               />

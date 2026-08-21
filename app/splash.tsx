@@ -71,7 +71,7 @@ export default function SplashScreenComponent() {
       <View style={styles.heroZone}>
         <Animated.View style={[styles.heroContent, heroStyle]}>
           <Image
-            source={require("@/assets/logos/sponsor-with.png")}
+            source={require("@/assets/logos/sponsor-with.webp")}
             style={styles.heroLogo}
             contentFit="contain"
           />
@@ -84,7 +84,7 @@ export default function SplashScreenComponent() {
           <View style={styles.divider} />
           <Text style={styles.labelBottom}>A PRODUCTION BY</Text>
           <Image
-            source={require("@/assets/logos/G_Red.png")}
+            source={require("@/assets/logos/G_Red.webp")}
             style={styles.bottomLogo}
             contentFit="cover"
           />

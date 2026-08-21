@@ -19,9 +19,9 @@
     "android": {
       "package": "com.foodilicious.live",
       "googleServicesFile": "./google-services.json",
+      "enableProguardInReleaseBuilds": true,
+      "enableSeparateBuildPerCPUArchitecture": true,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ]

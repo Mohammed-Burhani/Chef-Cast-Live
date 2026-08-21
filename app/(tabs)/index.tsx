@@ -290,12 +290,12 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerLogos}>
             <Image
-              source={require('@/assets/logos/G_Red.png')}
+              source={require('@/assets/logos/G_Red.webp')}
               style={styles.headerLogo}
               contentFit="cover"
             />
             <Image
-              source={require('@/assets/logos/G_Foodilicious_Clean.png')}
+              source={require('@/assets/logos/G_Foodilicious_Clean.webp')}
               style={styles.headerLogoWide}
               contentFit="cover"
             />
