@@ -153,10 +153,6 @@ export default function SignupScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Back button - shows on all steps, goes to previous screen on step 0 */}
-          <TouchableOpacity onPress={() => step === 0 ? router.back() : setStep(step - 1)} style={styles.backButton}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </TouchableOpacity>
 
           <View style={styles.logoArea}>
             <Image

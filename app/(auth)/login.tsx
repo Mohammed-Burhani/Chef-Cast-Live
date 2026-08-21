@@ -115,9 +115,6 @@ export default function LoginScreen() {
         style={styles.keyboardView}
       >
         <View style={[styles.content, { paddingTop: topPadding + 20, paddingBottom: insets.bottom + 40 }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </TouchableOpacity>
 
           {/* Logo area - matches welcome/signup */}
           <View style={styles.logoArea}>
