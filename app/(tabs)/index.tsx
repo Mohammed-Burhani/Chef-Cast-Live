@@ -280,7 +280,7 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 140 }]}
+        contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: bottomPadding + 70 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={false} onRefresh={() => refetch()} tintColor={colors.primary} />
@@ -779,43 +779,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Haier Sponsor Footer — compact vertical strip at the very end */}
-        <View style={styles.haierFooterAd}>
-          <View style={styles.haierFooterAdInner}>
-            <LinearGradient
-              colors={["rgba(204,0,0,0.08)", "rgba(212,160,23,0.08)"]}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            />
-            <View style={styles.haierFooterAdContent}>
-              <View style={styles.haierFooterAdLogoRow}>
-                <Image
-                  source={require('@/assets/logos/sponsor-haier.png')}
-                  style={styles.haierFooterAdLogo}
-                  contentFit="cover"
-                />
-                <Text style={styles.haierFooterAdKicker}>PRESENTING SPONSOR</Text>
-              </View>
-              <Text style={styles.haierFooterAdHeadline}>Complete Your Kitchen</Text>
-              <Text style={styles.haierFooterAdSubtext}>Precision appliances for every cook-along</Text>
-              <View style={styles.haierFooterAdProducts}>
-                {HAIER_PRODUCTS.map((product) => (
-                  <View key={product.id} style={styles.haierFooterAdProduct}>
-                    <product.Component width={44} height={33} />
-                    <Text style={styles.haierFooterAdProductName}>{product.name}</Text>
-                  </View>
-                ))}
-              </View>
-              <TouchableOpacity
-                style={[styles.haierFooterAdCta, { backgroundColor: colors.haierRed || colors.live }]}
-                onPress={() => { /* TODO: navigate to Haier partner page */ }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.haierFooterAdCtaText}>Explore Haier</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+       
       </ScrollView>
 
       {/* Floating Haier Product Carousel — bottom-right, dismissible, ultra-compact vertical */}
