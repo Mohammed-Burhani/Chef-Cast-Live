@@ -89,7 +89,6 @@ export default function WelcomeScreen() {
         id: `guest-${Date.now()}`,
         email: "guest@foodilicious.app",
         username: "Guest User",
-        avatar: null,
         xpTotal: 0,
         currentStreak: 0,
         longestStreak: 0,
