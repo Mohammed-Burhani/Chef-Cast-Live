@@ -3,7 +3,6 @@
  */
 
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
@@ -27,12 +26,6 @@ export default function CheckEmailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={["#E85200", "#2A1040", colors.background]}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-
       <View
         style={[
           styles.content,
@@ -43,7 +36,7 @@ export default function CheckEmailScreen() {
         ]}
       >
         <View style={styles.iconArea}>
-          <View style={[styles.iconCircle, { backgroundColor: `${colors.primary}22` }]}>
+          <View style={[styles.iconCircle, { backgroundColor: `${colors.primary}15`, shadowColor: colors.primary }]}>
             <Feather name="mail" size={40} color={colors.primary} />
           </View>
         </View>
@@ -99,6 +92,10 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     alignItems: "center",
     justifyContent: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -113,6 +110,10 @@ const styles = StyleSheet.create({
   button: {
     width: "100%",
     marginTop: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   resendLink: {
     marginTop: 8,

@@ -5,7 +5,6 @@
  */
 
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -80,7 +79,7 @@ export default function WelcomeScreen() {
   const handleGuestLogin = async () => {
     // Create guest/anonymous user
     const result = await signInAnonymously();
-    
+
     if (result.success) {
       router.replace("/(tabs)");
     } else {
@@ -103,12 +102,6 @@ export default function WelcomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={["#E85200", "#2A1040", colors.background]}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -122,11 +115,11 @@ export default function WelcomeScreen() {
       >
         {/* Logo */}
         <View style={styles.logoArea}>
-          <View style={[styles.logoCircle, { backgroundColor: colors.neonRed }]}>
+          <View style={[styles.logoCircle, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
             <Feather name="zap" size={28} color="#fff" />
           </View>
           <Text style={[styles.appName, { color: colors.foreground }]}>Foodilicious</Text>
-          <Text style={[styles.appTagline, { color: colors.neonRed }]}>LIVE</Text>
+          <Text style={[styles.appTagline, { color: colors.primary }]}>LIVE</Text>
         </View>
 
         <Text style={[styles.headline, { color: colors.foreground }]}>
@@ -154,7 +147,7 @@ export default function WelcomeScreen() {
                   {
                     backgroundColor:
                       selectedLevel === level.id
-                        ? `${colors.primary}22`
+                        ? `${colors.primary}15`
                         : colors.surface,
                     borderColor:
                       selectedLevel === level.id ? colors.primary : colors.border,
@@ -162,7 +155,7 @@ export default function WelcomeScreen() {
                   },
                 ]}
               >
-                <View style={[styles.levelIcon, { backgroundColor: `${colors.primary}22` }]}>
+                <View style={[styles.levelIcon, { backgroundColor: `${colors.primary}15` }]}>
                   <Feather name={level.icon} size={24} color={colors.primary} />
                 </View>
                 <View style={styles.levelText}>
@@ -229,13 +222,13 @@ export default function WelcomeScreen() {
                 style={[
                   styles.genderCard,
                   {
-                    backgroundColor: selectedGender === g.value ? `${colors.primary}22` : colors.surface,
+                    backgroundColor: selectedGender === g.value ? `${colors.primary}15` : colors.surface,
                     borderColor: selectedGender === g.value ? colors.primary : colors.border,
                     borderWidth: selectedGender === g.value ? 2 : 1,
                   },
                 ]}
               >
-                <View style={[styles.genderIcon, { backgroundColor: `${colors.primary}22` }]}>
+                <View style={[styles.genderIcon, { backgroundColor: `${colors.primary}15` }]}>
                   <Feather name={g.icon} size={24} color={colors.primary} />
                 </View>
                 <Text style={[styles.genderLabel, { color: colors.foreground }]}>
@@ -259,7 +252,7 @@ export default function WelcomeScreen() {
         {/* Guest button */}
         <TouchableOpacity
           onPress={handleGuestLogin}
-          style={[styles.guestButton, { borderColor: colors.border }]}
+          style={[styles.guestButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
         >
           <Feather name="user" size={18} color={colors.primary} />
           <Text style={[styles.guestButtonText, { color: colors.primary }]}>
@@ -313,11 +306,10 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#FF1744",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
   },
   appName: {
     fontSize: 24,
@@ -414,9 +406,8 @@ const styles = StyleSheet.create({
   },
   cta: {
     marginTop: 4,
-    shadowColor: "#E8572A",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
@@ -430,24 +421,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   guestButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  anonButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    shadowColor: "#FF1744",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  anonButtonText: {
     fontSize: 15,
     fontWeight: "700",
   },

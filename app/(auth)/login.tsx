@@ -3,7 +3,6 @@
  */
 
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -72,9 +71,9 @@ export default function LoginScreen() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setError("");
-    
+
     const result = await signInWithGoogle();
-    
+
     setGoogleLoading(false);
 
     if (!result.success && !result.cancelled) {
@@ -85,9 +84,9 @@ export default function LoginScreen() {
   const handleAppleSignIn = async () => {
     setAppleLoading(true);
     setError("");
-    
+
     const result = await signInWithApple();
-    
+
     setAppleLoading(false);
 
     if (!result.success && !result.cancelled) {
@@ -98,9 +97,9 @@ export default function LoginScreen() {
   const handleAnonymousSignIn = async () => {
     setAnonLoading(true);
     setError("");
-    
+
     const result = await signInAnonymously();
-    
+
     setAnonLoading(false);
 
     if (!result.success) {
@@ -110,11 +109,6 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={[colors.background, "#2A1040", colors.background]}
-        style={StyleSheet.absoluteFill}
-      />
-
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -216,7 +210,7 @@ export default function LoginScreen() {
               <TouchableOpacity
                 onPress={handleAnonymousSignIn}
                 disabled={anonLoading}
-                style={[styles.anonButton, { backgroundColor: `${colors.mutedForeground}15`, borderColor: colors.border }]}
+                style={[styles.anonButton, { backgroundColor: `${colors.mutedForeground}10`, borderColor: colors.border }]}
               >
                 {anonLoading ? (
                   <ActivityIndicator size="small" color={colors.mutedForeground} />
@@ -277,7 +271,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
-  error: { fontSize: 13, marginTop: -4 },
+  error: { fontSize: 13, marginTop: -4, textAlign: "center" },
   divider: {
     flexDirection: "row",
     alignItems: "center",
@@ -323,6 +317,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: "auto",
+    gap: 6,
   },
   footerText: { fontSize: 14 },
   footerLink: { fontSize: 14, fontWeight: "700" },
