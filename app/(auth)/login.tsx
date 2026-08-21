@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -118,6 +119,15 @@ export default function LoginScreen() {
             <Feather name="arrow-left" size={22} color={colors.foreground} />
           </TouchableOpacity>
 
+          {/* Logo area - matches welcome/signup */}
+          <View style={styles.logoArea}>
+            <Image
+              source={require('@/assets/logos/G_Foodilicious_Clean.webp')}
+              style={styles.headerLogoWide}
+              contentFit="cover"
+            />
+          </View>
+
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.foreground }]}>Welcome back</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
@@ -126,104 +136,104 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.form}>
-              <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Feather name="mail" size={18} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Email address"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  editable={!loading}
-                />
-              </View>
+            <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Feather name="mail" size={18} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.input, { color: colors.foreground }]}
+                placeholder="Email address"
+                placeholderTextColor={colors.mutedForeground}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                editable={!loading}
+              />
+            </View>
 
-              <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Feather name="lock" size={18} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Password"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoComplete="password"
-                  editable={!loading}
-                />
-              </View>
+            <View style={[styles.inputWrapper, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Feather name="lock" size={18} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.input, { color: colors.foreground }]}
+                placeholder="Password"
+                placeholderTextColor={colors.mutedForeground}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                editable={!loading}
+              />
+            </View>
 
-              {error ? (
-                <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
-              ) : null}
+            {error ? (
+              <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+            ) : null}
 
-              <Button title="Sign In" loading={loading} onPress={handleMagicLink} />
+            <Button title="Sign In" loading={loading} onPress={handleMagicLink} />
 
-              <View style={styles.divider}>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              </View>
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            </View>
 
-              {/* Google Sign-In */}
+            {/* Google Sign-In */}
+            <TouchableOpacity
+              onPress={handleGoogleSignIn}
+              disabled={googleLoading}
+              style={[styles.oauthButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              {googleLoading ? (
+                <ActivityIndicator size="small" color={colors.foreground} />
+              ) : (
+                <>
+                  <Feather name="chrome" size={18} color={colors.foreground} />
+                  <Text style={[styles.oauthButtonText, { color: colors.foreground }]}>
+                    Continue with Google
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Apple Sign-In (iOS only) */}
+            {Platform.OS === 'ios' && (
               <TouchableOpacity
-                onPress={handleGoogleSignIn}
-                disabled={googleLoading}
+                onPress={handleAppleSignIn}
+                disabled={appleLoading}
                 style={[styles.oauthButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
-                {googleLoading ? (
+                {appleLoading ? (
                   <ActivityIndicator size="small" color={colors.foreground} />
                 ) : (
                   <>
-                    <Feather name="chrome" size={18} color={colors.foreground} />
+                    <Feather name="smartphone" size={18} color={colors.foreground} />
                     <Text style={[styles.oauthButtonText, { color: colors.foreground }]}>
-                      Continue with Google
+                      Continue with Apple
                     </Text>
                   </>
                 )}
               </TouchableOpacity>
+            )}
 
-              {/* Apple Sign-In (iOS only) */}
-              {Platform.OS === 'ios' && (
-                <TouchableOpacity
-                  onPress={handleAppleSignIn}
-                  disabled={appleLoading}
-                  style={[styles.oauthButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                >
-                  {appleLoading ? (
-                    <ActivityIndicator size="small" color={colors.foreground} />
-                  ) : (
-                    <>
-                      <Feather name="smartphone" size={18} color={colors.foreground} />
-                      <Text style={[styles.oauthButtonText, { color: colors.foreground }]}>
-                        Continue with Apple
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+            {/* Anonymous Sign-In */}
+            <TouchableOpacity
+              onPress={handleAnonymousSignIn}
+              disabled={anonLoading}
+              style={[styles.anonButton, { backgroundColor: `${colors.mutedForeground}10`, borderColor: colors.border }]}
+            >
+              {anonLoading ? (
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+              ) : (
+                <>
+                  <Feather name="user-x" size={18} color={colors.mutedForeground} />
+                  <Text style={[styles.anonButtonText, { color: colors.mutedForeground }]}>
+                    Continue as Guest
+                  </Text>
+                </>
               )}
-
-              {/* Anonymous Sign-In */}
-              <TouchableOpacity
-                onPress={handleAnonymousSignIn}
-                disabled={anonLoading}
-                style={[styles.anonButton, { backgroundColor: `${colors.mutedForeground}10`, borderColor: colors.border }]}
-              >
-                {anonLoading ? (
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                ) : (
-                  <>
-                    <Feather name="user-x" size={18} color={colors.mutedForeground} />
-                    <Text style={[styles.anonButtonText, { color: colors.mutedForeground }]}>
-                      Continue as Guest
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
@@ -257,6 +267,33 @@ const styles = StyleSheet.create({
   header: { gap: 6 },
   title: { fontSize: 30, fontWeight: "800", letterSpacing: -0.5 },
   subtitle: { fontSize: 16 },
+  logoArea: {
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  logoCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  appName: {
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  appTagline: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 3,
+    marginTop: -4,
+  },
   form: { gap: 14 },
   inputWrapper: {
     flexDirection: "row",
@@ -321,4 +358,5 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 14 },
   footerLink: { fontSize: 14, fontWeight: "700" },
+  headerLogoWide: { width: 180, height: 70 },
 });

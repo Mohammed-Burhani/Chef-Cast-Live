@@ -9,6 +9,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -152,38 +153,37 @@ export default function SignupScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {step > 0 && (
-            <TouchableOpacity onPress={() => setStep(step - 1)} style={styles.backButton}>
-              <Feather name="arrow-left" size={22} color={colors.foreground} />
-            </TouchableOpacity>
-          )}
+          {/* Back button - shows on all steps, goes to previous screen on step 0 */}
+          <TouchableOpacity onPress={() => step === 0 ? router.back() : setStep(step - 1)} style={styles.backButton}>
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
+          </TouchableOpacity>
 
           <View style={styles.logoArea}>
-            <View style={[styles.logoCircle, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
-              <Feather name="zap" size={28} color="#fff" />
-            </View>
-            <Text style={[styles.appName, { color: colors.foreground }]}>Foodilicious</Text>
-            <Text style={[styles.appTagline, { color: colors.primary }]}>LIVE</Text>
+            <Image
+              source={require('@/assets/logos/G_Foodilicious_Clean.webp')}
+              style={styles.headerLogoWide}
+              contentFit="cover"
+            />
           </View>
 
           <Text style={[styles.headline, { color: colors.foreground }]}>
             {step === 0
               ? "Create your account"
               : step === 1
-              ? "What's your cooking level?"
-              : step === 2
-              ? "What cuisines excite you?"
-              : "Select your gender"}
+                ? "What's your cooking level?"
+                : step === 2
+                  ? "What cuisines excite you?"
+                  : "Select your gender"}
           </Text>
 
           <Text style={[styles.subtext, { color: colors.mutedForeground }]}>
             {step === 0
               ? "Join the live cooking community"
               : step === 1
-              ? "We'll tailor the experience"
-              : step === 2
-              ? "We'll suggest episodes you'll love"
-              : "Help us personalize your experience"}
+                ? "We'll tailor the experience"
+                : step === 2
+                  ? "We'll suggest episodes you'll love"
+                  : "Help us personalize your experience"}
           </Text>
 
           {/* Step 0: Email & Username & Password */}
@@ -352,8 +352,8 @@ export default function SignupScreen() {
                   step === 1
                     ? !selectedLevel
                     : step === 2
-                    ? selectedCuisines.length === 0
-                    : !selectedGender
+                      ? selectedCuisines.length === 0
+                      : !selectedGender
                 }
                 loading={loading}
                 onPress={handleNext}
@@ -544,4 +544,5 @@ const styles = StyleSheet.create({
   loginText: {
     fontSize: 13,
   },
+  headerLogoWide: { width: 180, height: 70 },
 });

@@ -114,11 +114,11 @@ export default function WelcomeScreen() {
       >
         {/* Logo */}
         <View style={styles.logoArea}>
-          <View style={[styles.logoCircle, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
-            <Feather name="zap" size={28} color="#fff" />
-          </View>
-          <Text style={[styles.appName, { color: colors.foreground }]}>Foodilicious</Text>
-          <Text style={[styles.appTagline, { color: colors.primary }]}>LIVE</Text>
+          <Image
+            source={require('@/assets/logos/G_Foodilicious_Clean.webp')}
+            style={styles.headerLogoWide}
+            contentFit="cover"
+          />
         </View>
 
         <Text style={[styles.headline, { color: colors.foreground }]}>
@@ -129,8 +129,8 @@ export default function WelcomeScreen() {
           {step === 0
             ? "We'll tailor the experience to match your skills"
             : step === 1
-            ? "We'll suggest episodes you'll love"
-            : "Help us personalize your experience"}
+              ? "We'll suggest episodes you'll love"
+              : "Help us personalize your experience"}
         </Text>
 
         {/* Step 0: Cooking Level */}
@@ -438,4 +438,5 @@ const styles = StyleSheet.create({
   loginText: {
     fontSize: 13,
   },
+  headerLogoWide: { width: 180, height: 70 },
 });

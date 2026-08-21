@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
   header: { gap: 8 },
   headerLogos: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
   headerLogo: { width: 140, height: 56 },
-  headerLogoWide: { width: 140, height: 40 },
+  headerLogoWide: { width: 140, height: 50 },
   greetingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   greeting: { fontSize: 14 },
   username: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
