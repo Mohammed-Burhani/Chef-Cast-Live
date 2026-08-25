@@ -1,22 +1,24 @@
 /**
  * Typography system for Foodilicious Live
  *
- * Uses Sora font family for headings/titles and Nunito for body text
+ * Uses Playfair Display for headings/titles and Nunito for body text
  * (loaded via @expo-google-fonts in app/_layout.tsx)
  * Provides consistent font family, size, weight, and line height across the app.
  */
 
-// Font family names - Sora for headings/titles, Nunito for body text
+// Font family names - Playfair Display for headings/titles, Nunito for body text
 export const fontFamily = {
   regular: 'Nunito_400Regular',
   medium: 'Nunito_500Medium',
   semiBold: 'Nunito_600SemiBold',
   bold: 'Nunito_700Bold',
-  // Sora variants for headings
-  soraRegular: 'Sora_400Regular',
-  soraMedium: 'Sora_500Medium',
-  soraSemiBold: 'Sora_600SemiBold',
-  soraBold: 'Sora_700Bold',
+  // Playfair Display variants for headings
+  playfairRegular: 'PlayfairDisplay_400Regular',
+  playfairMedium: 'PlayfairDisplay_500Medium',
+  playfairSemiBold: 'PlayfairDisplay_600SemiBold',
+  playfairBold: 'PlayfairDisplay_700Bold',
+  playfairExtraBold: 'PlayfairDisplay_800ExtraBold',
+  playfairBlack: 'PlayfairDisplay_900Black',
 } as const;
 
 export type FontFamily = keyof typeof fontFamily;
@@ -62,69 +64,69 @@ export const letterSpacing = {
 
 // Predefined text styles for common use cases
 export const textStyles = {
-  // Display styles - Using Sora
+  // Display styles - Using Playfair Display
   displayLarge: {
-    fontFamily: fontFamily.soraBold,
+    fontFamily: fontFamily.playfairBlack,
     fontSize: fontSize['5xl'],
-    fontWeight: '700' as const,
+    fontWeight: '900' as const,
     lineHeight: fontSize['5xl'] * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
   displayMedium: {
-    fontFamily: fontFamily.soraBold,
+    fontFamily: fontFamily.playfairBold,
     fontSize: fontSize['4xl'],
     fontWeight: '700' as const,
     lineHeight: fontSize['4xl'] * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
   displaySmall: {
-    fontFamily: fontFamily.soraSemiBold,
+    fontFamily: fontFamily.playfairSemiBold,
     fontSize: fontSize['3xl'],
     fontWeight: '600' as const,
     lineHeight: fontSize['3xl'] * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
 
-  // Headline styles - Using Sora
+  // Headline styles - Using Playfair Display
   headlineLarge: {
-    fontFamily: fontFamily.soraBold,
+    fontFamily: fontFamily.playfairBold,
     fontSize: fontSize['2xl'],
     fontWeight: '700' as const,
     lineHeight: fontSize['2xl'] * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
   headlineMedium: {
-    fontFamily: fontFamily.soraSemiBold,
+    fontFamily: fontFamily.playfairSemiBold,
     fontSize: fontSize.xl,
     fontWeight: '600' as const,
     lineHeight: fontSize.xl * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
   headlineSmall: {
-    fontFamily: fontFamily.soraSemiBold,
+    fontFamily: fontFamily.playfairSemiBold,
     fontSize: fontSize.lg,
     fontWeight: '600' as const,
     lineHeight: fontSize.lg * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
 
-  // Title styles - Using Sora
+  // Title styles - Using Playfair Display
   titleLarge: {
-    fontFamily: fontFamily.soraMedium,
+    fontFamily: fontFamily.playfairMedium,
     fontSize: fontSize.lg,
     fontWeight: '500' as const,
     lineHeight: fontSize.lg * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
   titleMedium: {
-    fontFamily: fontFamily.soraMedium,
+    fontFamily: fontFamily.playfairMedium,
     fontSize: fontSize.md,
     fontWeight: '500' as const,
     lineHeight: fontSize.md * lineHeight.normal,
     letterSpacing: letterSpacing.wide,
   },
   titleSmall: {
-    fontFamily: fontFamily.soraMedium,
+    fontFamily: fontFamily.playfairMedium,
     fontSize: fontSize.sm,
     fontWeight: '500' as const,
     lineHeight: fontSize.sm * lineHeight.normal,

@@ -1,9 +1,11 @@
 import {
-  Sora_400Regular,
-  Sora_500Medium,
-  Sora_600SemiBold,
-  Sora_700Bold,
-} from "@expo-google-fonts/sora";
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_500Medium,
+  PlayfairDisplay_600SemiBold,
+  PlayfairDisplay_700Bold,
+  PlayfairDisplay_800ExtraBold,
+  PlayfairDisplay_900Black,
+} from "@expo-google-fonts/playfair-display";
 import {
   Nunito_400Regular,
   Nunito_500Medium,
@@ -105,10 +107,12 @@ export default function RootLayout() {
     ...AntDesign.font,
     ...Ionicons.font,
     ...MaterialIcons.font,
-    Sora_400Regular,
-    Sora_500Medium,
-    Sora_600SemiBold,
-    Sora_700Bold,
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+    PlayfairDisplay_800ExtraBold,
+    PlayfairDisplay_900Black,
     Nunito_400Regular,
     Nunito_500Medium,
     Nunito_600SemiBold,
