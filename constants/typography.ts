@@ -1,16 +1,22 @@
 /**
  * Typography system for Foodilicious Live
  *
- * Uses Poppins font family (loaded via @expo-google-fonts/poppins in app/_layout.tsx)
+ * Uses Sora font family for headings/titles and Nunito for body text
+ * (loaded via @expo-google-fonts in app/_layout.tsx)
  * Provides consistent font family, size, weight, and line height across the app.
  */
 
-// Font family names as loaded by @expo-google-fonts/poppins
+// Font family names - Sora for headings/titles, Nunito for body text
 export const fontFamily = {
-  regular: 'Poppins_400Regular',
-  medium: 'Poppins_500Medium',
-  semiBold: 'Poppins_600SemiBold',
-  bold: 'Poppins_700Bold',
+  regular: 'Nunito_400Regular',
+  medium: 'Nunito_500Medium',
+  semiBold: 'Nunito_600SemiBold',
+  bold: 'Nunito_700Bold',
+  // Sora variants for headings
+  soraRegular: 'Sora_400Regular',
+  soraMedium: 'Sora_500Medium',
+  soraSemiBold: 'Sora_600SemiBold',
+  soraBold: 'Sora_700Bold',
 } as const;
 
 export type FontFamily = keyof typeof fontFamily;
@@ -56,69 +62,69 @@ export const letterSpacing = {
 
 // Predefined text styles for common use cases
 export const textStyles = {
-  // Display styles
+  // Display styles - Using Sora
   displayLarge: {
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.soraBold,
     fontSize: fontSize['5xl'],
     fontWeight: '700' as const,
     lineHeight: fontSize['5xl'] * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
   displayMedium: {
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.soraBold,
     fontSize: fontSize['4xl'],
     fontWeight: '700' as const,
     lineHeight: fontSize['4xl'] * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
   displaySmall: {
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.soraSemiBold,
     fontSize: fontSize['3xl'],
     fontWeight: '600' as const,
     lineHeight: fontSize['3xl'] * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
 
-  // Headline styles
+  // Headline styles - Using Sora
   headlineLarge: {
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.soraBold,
     fontSize: fontSize['2xl'],
     fontWeight: '700' as const,
     lineHeight: fontSize['2xl'] * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
   headlineMedium: {
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.soraSemiBold,
     fontSize: fontSize.xl,
     fontWeight: '600' as const,
     lineHeight: fontSize.xl * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
   headlineSmall: {
-    fontFamily: fontFamily.semiBold,
+    fontFamily: fontFamily.soraSemiBold,
     fontSize: fontSize.lg,
     fontWeight: '600' as const,
     lineHeight: fontSize.lg * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
 
-  // Title styles
+  // Title styles - Using Sora
   titleLarge: {
-    fontFamily: fontFamily.medium,
+    fontFamily: fontFamily.soraMedium,
     fontSize: fontSize.lg,
     fontWeight: '500' as const,
     lineHeight: fontSize.lg * lineHeight.normal,
     letterSpacing: letterSpacing.normal,
   },
   titleMedium: {
-    fontFamily: fontFamily.medium,
+    fontFamily: fontFamily.soraMedium,
     fontSize: fontSize.md,
     fontWeight: '500' as const,
     lineHeight: fontSize.md * lineHeight.normal,
     letterSpacing: letterSpacing.wide,
   },
   titleSmall: {
-    fontFamily: fontFamily.medium,
+    fontFamily: fontFamily.soraMedium,
     fontSize: fontSize.sm,
     fontWeight: '500' as const,
     lineHeight: fontSize.sm * lineHeight.normal,
