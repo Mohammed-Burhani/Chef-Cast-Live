@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useTypography } from "@/hooks/useTypography";
 
 export type ErrorFallbackProps = {
   error: Error;
@@ -21,6 +22,7 @@ export type ErrorFallbackProps = {
 
 export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const colors = useColors();
+  const { styles: typo } = useTypography();
   const insets = useSafeAreaInsets();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -69,11 +71,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
       ) : null}
 
       <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.foreground }]}>
+        <Text style={[typo.displaySmall, { color: colors.foreground }]}>
           Something went wrong
         </Text>
 
-        <Text style={[styles.message, { color: colors.mutedForeground }]}>
+        <Text style={[typo.bodyMedium, { color: colors.mutedForeground }]}>
           Please reload the app to continue.
         </Text>
 
@@ -90,7 +92,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         >
           <Text
             style={[
-              styles.buttonText,
+              typo.labelLarge,
               { color: colors.primaryForeground },
             ]}
           >
@@ -119,7 +121,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                   { borderBottomColor: colors.border },
                 ]}
               >
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                <Text style={[typo.headlineSmall, { color: colors.foreground }]}>
                   Error Details
                 </Text>
                 <Pressable
@@ -151,7 +153,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                 >
                   <Text
                     style={[
-                      styles.errorText,
+                      typo.bodySmall,
                       {
                         color: colors.foreground,
                         fontFamily: monoFont,
@@ -187,17 +189,6 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 600,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    textAlign: "center",
-    lineHeight: 40,
-  },
-  message: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-  },
   topButton: {
     position: "absolute",
     right: 16,
@@ -223,11 +214,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  buttonText: {
-    fontWeight: "600",
-    textAlign: "center",
-    fontSize: 16,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(26, 10, 46, 0.85)",
@@ -248,10 +234,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
   closeButton: {
     width: 44,
     height: 44,
@@ -269,10 +251,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     padding: 16,
-  },
-  errorText: {
-    fontSize: 12,
-    lineHeight: 18,
-    width: "100%",
   },
 });

@@ -9,6 +9,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { useTypography } from "@/hooks/useTypography";
 import { Badge } from "@/types";
 
 interface BadgeCardProps {
@@ -33,6 +34,7 @@ const ICON_MAP: Record<string, keyof typeof Feather.glyphMap> = {
 
 export function BadgeCard({ badge, onPress }: BadgeCardProps) {
   const colors = useColors();
+  const { styles: typo } = useTypography();
   const iconName = ICON_MAP[badge.iconName] ?? "award";
 
   const progress = badge.progress ?? 0;
@@ -79,7 +81,7 @@ export function BadgeCard({ badge, onPress }: BadgeCardProps) {
       {/* Name */}
       <Text
         style={[
-          styles.name,
+          typo.titleSmall,
           { color: badge.isUnlocked ? colors.foreground : colors.mutedForeground },
         ]}
         numberOfLines={2}
@@ -104,7 +106,7 @@ export function BadgeCard({ badge, onPress }: BadgeCardProps) {
 
       {badge.isUnlocked && (
         <View style={[styles.xpBadge, { backgroundColor: `${colors.accent}22` }]}>
-          <Text style={[styles.xpText, { color: colors.accent }]}>+{badge.xpReward} XP</Text>
+          <Text style={[typo.labelSmall, { color: colors.accent }]}>+{badge.xpReward} XP</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -138,12 +140,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  name: {
-    fontSize: 11,
-    fontWeight: "600",
-    textAlign: "center",
-    lineHeight: 14,
-  },
   progressTrack: {
     width: "100%",
     height: 3,
@@ -158,9 +154,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 20,
-  },
-  xpText: {
-    fontSize: 10,
-    fontWeight: "700",
   },
 });

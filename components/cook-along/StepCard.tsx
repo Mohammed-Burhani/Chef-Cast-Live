@@ -8,6 +8,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { useTypography } from "@/hooks/useTypography";
 import { RecipeStep } from "@/types";
 
 interface StepCardProps {
@@ -28,6 +29,7 @@ const TECHNIQUE_LABELS: Record<string, string> = {
 
 export function StepCard({ step, stepNumber, totalSteps, isCompleted }: StepCardProps) {
   const colors = useColors();
+  const { styles: typo } = useTypography();
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -44,17 +46,17 @@ export function StepCard({ step, stepNumber, totalSteps, isCompleted }: StepCard
           {isCompleted ? (
             <Feather name="check" size={14} color="#F5F5F5" />
           ) : (
-            <Text style={styles.stepNumber}>{stepNumber}</Text>
+            <Text style={[typo.labelLarge, { color: "#F5F5F5" }]}>{stepNumber}</Text>
           )}
         </View>
 
-        <Text style={[styles.stepOf, { color: colors.mutedForeground }]}>
+        <Text style={[typo.bodySmall, { color: colors.mutedForeground }]}>
           Step {stepNumber} of {totalSteps}
         </Text>
 
         {step.techniqueTag && (
           <View style={[styles.techniqueBadge, { backgroundColor: `${colors.accent}22` }]}>
-            <Text style={[styles.techniqueText, { color: colors.accent }]}>
+            <Text style={[typo.labelSmall, { color: colors.accent }]}>
               {TECHNIQUE_LABELS[step.techniqueTag] ?? step.techniqueTag}
             </Text>
           </View>
@@ -62,7 +64,7 @@ export function StepCard({ step, stepNumber, totalSteps, isCompleted }: StepCard
       </View>
 
       {/* Instruction */}
-      <Text style={[styles.instruction, { color: colors.foreground }]}>
+      <Text style={[typo.bodyLarge, { color: colors.foreground }]}>
         {step.instruction}
       </Text>
 
@@ -70,8 +72,8 @@ export function StepCard({ step, stepNumber, totalSteps, isCompleted }: StepCard
       {step.tip && (
         <View style={[styles.tipBox, { backgroundColor: `${colors.primary}15`, borderLeftColor: colors.primary }]}>
           <Feather name="info" size={14} color={colors.primary} />
-          <Text style={[styles.tipText, { color: colors.foreground }]}>
-            <Text style={{ color: colors.primary, fontWeight: "700" }}>Chef tip: </Text>
+          <Text style={[typo.bodyMedium, { color: colors.foreground }]}>
+            <Text style={{ color: colors.primary, ...typo.labelMedium }}>Chef tip: </Text>
             {step.tip}
           </Text>
         </View>
@@ -99,29 +101,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  stepNumber: {
-    color: "#F5F5F5",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  stepOf: {
-    fontSize: 13,
-    flex: 1,
-  },
   techniqueBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
-  },
-  techniqueText: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  instruction: {
-    fontSize: 17,
-    lineHeight: 26,
-    fontWeight: "400",
   },
   tipBox: {
     flexDirection: "row",
@@ -130,10 +113,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderLeftWidth: 3,
     alignItems: "flex-start",
-  },
-  tipText: {
-    fontSize: 14,
-    lineHeight: 20,
-    flex: 1,
   },
 });

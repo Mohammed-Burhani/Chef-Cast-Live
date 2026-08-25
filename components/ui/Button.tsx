@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { useTypography } from "@/hooks/useTypography";
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -39,6 +40,7 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const colors = useColors();
+  const { styles: typo } = useTypography();
 
   const handlePress = (e: Parameters<NonNullable<TouchableOpacityProps["onPress"]>>[0]) => {
     if (Platform.OS !== "web") {
@@ -69,7 +71,11 @@ export function Button({
   }[variant];
 
   const paddingVertical = { sm: 10, md: 14, lg: 18 }[size];
-  const fontSize = { sm: 13, md: 15, lg: 17 }[size];
+  const buttonTypography = {
+    sm: typo.labelSmall,
+    md: typo.labelMedium,
+    lg: typo.labelLarge,
+  }[size];
 
   return (
     <TouchableOpacity
@@ -95,7 +101,7 @@ export function Button({
       ) : (
         <View style={styles.content}>
           {icon && <View style={styles.icon}>{icon}</View>}
-          <Text style={[styles.label, { color: textColor, fontSize }]}>{title}</Text>
+          <Text style={[styles.label, buttonTypography, { color: textColor }]}>{title}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -118,7 +124,6 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   label: {
-    fontWeight: "600",
     letterSpacing: 0.2,
   },
 });

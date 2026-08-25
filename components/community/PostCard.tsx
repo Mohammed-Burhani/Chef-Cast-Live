@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { useTypography } from "@/hooks/useTypography";
 import { CommunityPost } from "@/types";
 
 interface PostCardProps {
@@ -40,6 +41,7 @@ export function PostCard({
   onReport,
 }: PostCardProps) {
   const colors = useColors();
+  const { styles: typo } = useTypography();
   const [isLiked, setIsLiked] = useState(post.isLiked);
   const [isSaved, setIsSaved] = useState(post.isSaved || false);
   const [likeCount, setLikeCount] = useState(post.likes);
@@ -71,7 +73,7 @@ export function PostCard({
         return (
           <Text
             key={`hashtag-${index}`}
-            style={[styles.hashtag, { color: colors.primary }]}
+            style={[typo.bodySmall, { color: colors.primary }]}
             onPress={() => onHashtagPress(part)}
           >
             #{part}
@@ -79,7 +81,7 @@ export function PostCard({
         );
       }
       return (
-        <Text key={`text-${index}`} style={[styles.captionText, { color: colors.foreground }]}>
+        <Text key={`text-${index}`} style={[typo.bodySmall, { color: colors.foreground }]}>
           {part}
         </Text>
       );
@@ -109,11 +111,11 @@ export function PostCard({
             contentFit="cover"
           />
           <View style={styles.userDetails}>
-            <Text style={[styles.username, { color: colors.foreground }]}>
+            <Text style={[typo.labelSmall, { color: colors.foreground }]}>
               {post.username}
             </Text>
             {post.location && (
-              <Text style={[styles.location, { color: colors.mutedForeground }]}>
+              <Text style={[typo.caption, { color: colors.mutedForeground }]}>
                 {post.location}
               </Text>
             )}
@@ -167,17 +169,17 @@ export function PostCard({
 
       {/* Likes */}
       <View style={styles.likesSection}>
-        <Text style={[styles.likes, { color: colors.foreground }]}>
+        <Text style={[typo.labelSmall, { color: colors.foreground }]}>
           {(likeCount || 0).toLocaleString()} likes
         </Text>
       </View>
 
       {/* Caption */}
       <View style={styles.captionSection}>
-        <Text style={[styles.captionUsername, { color: colors.foreground }]}>
+        <Text style={[typo.labelSmall, { color: colors.foreground }]}>
           {post.username}
         </Text>
-        <Text style={styles.caption}>{formatCaption(post.caption)}</Text>
+        <Text style={typo.bodySmall}>{formatCaption(post.caption)}</Text>
       </View>
 
       {/* Comments */}
@@ -186,7 +188,7 @@ export function PostCard({
           onPress={() => onComment(post.id)}
           style={styles.commentsSection}
         >
-          <Text style={[styles.comments, { color: colors.mutedForeground }]}>
+          <Text style={[typo.caption, { color: colors.mutedForeground }]}>
             View all {post.comments} comments
           </Text>
         </TouchableOpacity>
@@ -194,7 +196,7 @@ export function PostCard({
 
       {/* Time */}
       <View style={styles.timeSection}>
-        <Text style={[styles.time, { color: colors.mutedForeground }]}>
+        <Text style={[typo.caption, { color: colors.mutedForeground }]}>
           {timeAgo(post.createdAt)}
         </Text>
       </View>
@@ -226,13 +228,6 @@ const styles = StyleSheet.create({
   userDetails: {
     gap: 2,
   },
-  username: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  location: {
-    fontSize: 11,
-  },
   moreButton: {
     padding: 4,
   },
@@ -259,46 +254,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 4,
   },
-  likes: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
   captionSection: {
     flexDirection: "row",
     paddingHorizontal: 12,
     paddingBottom: 4,
   },
-  captionUsername: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginRight: 4,
-  },
-  caption: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  captionText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  hashtag: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
   commentsSection: {
     paddingHorizontal: 12,
     paddingBottom: 4,
   },
-  comments: {
-    fontSize: 13,
-  },
   timeSection: {
     paddingHorizontal: 12,
     paddingBottom: 8,
-  },
-  time: {
-    fontSize: 11,
   },
 });

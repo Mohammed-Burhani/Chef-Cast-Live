@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { useTypography } from '@/hooks/useTypography';
 import type { LeaderboardEntry } from '@/store/useLiveQuizStore';
 
 interface LeaderboardPanelProps {
@@ -28,6 +29,7 @@ export function LeaderboardPanel({
   title = 'Leaderboard',
 }: LeaderboardPanelProps) {
   const colors = useColors();
+  const { styles: typo } = useTypography();
 
   const getMedalColor = (rank: number) => {
     switch (rank) {
@@ -56,7 +58,7 @@ export function LeaderboardPanel({
   return (
     <View style={styles.container}>
       {title && (
-        <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+        <Text style={[typo.headlineMedium, { color: colors.foreground }]}>{title}</Text>
       )}
 
       {/* Compact: horizontal top 3 */}
@@ -76,10 +78,10 @@ export function LeaderboardPanel({
               ]}
             >
               <Text style={styles.medalEmoji}>{getRankIcon(idx + 1)}</Text>
-              <Text style={[styles.topUsername, { color: colors.foreground }]} numberOfLines={1}>
+              <Text style={[typo.labelMedium, { color: colors.foreground }]} numberOfLines={1}>
                 {entry.username}
               </Text>
-              <Text style={[styles.topScore, { color: colors.accent }]}>
+              <Text style={[typo.headlineSmall, { color: colors.accent }]}>
                 {entry.totalScore.toLocaleString()}
               </Text>
             </View>
@@ -113,22 +115,22 @@ export function LeaderboardPanel({
                       { backgroundColor: idx < 3 ? getMedalColor(idx + 1) : `${colors.mutedForeground}22` },
                     ]}
                   >
-                    <Text style={[styles.rankText, { color: idx < 3 ? '#1A1A1A' : colors.foreground }]}>
+                    <Text style={[typo.labelMedium, { color: idx < 3 ? '#1A1A1A' : colors.foreground }]}>
                       {getRankIcon(idx + 1)}
                     </Text>
                   </View>
                   <Text
-                    style={[styles.username, { color: entry.isCurrentUser ? colors.accent : colors.foreground }]}
+                    style={[typo.labelMedium, { color: entry.isCurrentUser ? colors.accent : colors.foreground }]}
                     numberOfLines={1}
                   >
                     {entry.username}
                   </Text>
                 </View>
                 <View style={styles.rowRight}>
-                  <Text style={[styles.scoreValue, { color: entry.isCurrentUser ? colors.accent : colors.accent }]}>
+                  <Text style={[typo.headlineSmall, { color: colors.accent }]}>
                     {entry.totalScore.toLocaleString()}
                   </Text>
-                  <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>
+                  <Text style={[typo.caption, { color: colors.mutedForeground }]}>
                     pts
                   </Text>
                 </View>
@@ -143,12 +145,12 @@ export function LeaderboardPanel({
         <View style={[styles.userFooter, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
           <View style={styles.footerLeft}>
             <View style={[styles.rankBadge, { backgroundColor: `${colors.accent}22` }]}>
-              <Text style={[styles.rankText, { color: colors.accent }]}>#{viewerRank}</Text>
+              <Text style={[typo.labelMedium, { color: colors.accent }]}>#{viewerRank}</Text>
             </View>
-            <Text style={[styles.footerLabel, { color: colors.foreground }]}>You</Text>
+            <Text style={[typo.labelMedium, { color: colors.foreground }]}>You</Text>
           </View>
           {currentUserScore !== undefined && (
-            <Text style={[styles.footerScore, { color: colors.accent }]}>
+            <Text style={[typo.headlineSmall, { color: colors.accent }]}>
               {currentUserScore.toLocaleString()} pts
             </Text>
           )}
@@ -161,10 +163,6 @@ export function LeaderboardPanel({
 const styles = StyleSheet.create({
   container: {
     gap: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
   },
   topThreeRow: {
     flexDirection: 'row',
@@ -180,15 +178,6 @@ const styles = StyleSheet.create({
   },
   medalEmoji: {
     fontSize: 24,
-  },
-  topUsername: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  topScore: {
-    fontSize: 16,
-    fontWeight: '800',
   },
   list: {
     gap: 8,
@@ -213,26 +202,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rankText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  username: {
-    fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
-  },
   rowRight: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 4,
-  },
-  scoreValue: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  scoreLabel: {
-    fontSize: 10,
   },
   userFooter: {
     flexDirection: 'row',
@@ -247,13 +220,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  footerLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  footerScore: {
-    fontSize: 16,
-    fontWeight: '800',
   },
 });
